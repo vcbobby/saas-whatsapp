@@ -1,28 +1,36 @@
 {
-  "name": "saas-whatsapp",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "next": "^16.4.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "zod": "4.6.5"
-  },
-  "devDependencies": {
-    "@tailwindcss/turbopack": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "^16.4.0",
-    "tailwindcss": "^4",
-    "typescript": "^5"
-  }
+    "name": "saas-whatsapp",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint",
+        "test": "vitest run",
+        "db:up": "docker compose --env-file .env.local up -d db",
+        "db:down": "docker compose --env-file .env.local down",
+        "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
+        "admin:create": "node --env-file=.env.local scripts/create-super-admin.mjs",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@node-rs/argon2": "^2.2.2",
+        "next": "^16.4.0",
+        "pg": "^8.23.1",
+        "react": "19.3.0",
+        "react-dom": "19.3.0"
+    },
+    "devDependencies": {
+        "@tailwindcss/turbopack": "^4",
+        "@types/node": "^24.19.1",
+        "@types/pg": "^8.23.1",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "eslint": "^9",
+        "eslint-config-next": "^16.4.0",
+        "tailwindcss": "^4",
+        "typescript": "^5",
+        "vitest": "^5.0.3"
+    }
 }
