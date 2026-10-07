@@ -1,0 +1,27 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: saas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?falta POSTGRES_DB en .env.local}
+      POSTGRES_USER: ${POSTGRES_USER:?falta POSTGRES_USER en .env.local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en .env.local}
+      APP_OWNER_PASSWORD: ${APP_OWNER_PASSWORD:?falta APP_OWNER_PASSWORD en .env.local}
+      APP_USER_PASSWORD: ${APP_USER_PASSWORD:?falta APP_USER_PASSWORD en .env.local}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - saas_pgdata:/var/lib/postgresql/data
+      - ./db/roles.sql:/roles/roles.sql:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  saas_pgdata:
