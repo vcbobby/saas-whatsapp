@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  echo "✖ Docker no está disponible. Abre Docker Desktop, espera a que arranque y repite el commit."
+  exit 1
+fi
+
+echo "🔍 Buscando secretos en los cambios..."
+docker run --rm \
+  -v "$(pwd):/repo" \
+  -e GIT_CONFIG_COUNT=1 \
+  -e GIT_CONFIG_KEY_0=safe.directory \
+  -e GIT_CONFIG_VALUE_0=/repo \
+  ghcr.io/gitleaks/gitleaks:latest \
+  git --pre-commit --staged --redact -v /repo
+
+echo "✔ Sin secretos en los cambios."
