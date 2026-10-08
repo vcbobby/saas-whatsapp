@@ -81,3 +81,15 @@ export function effectiveTenant(session: Session): TenantContext | null {
   }
   return null;
 }
+
+/** Para páginas del servidor (Server Components): lee la sesión desde las cabeceras. */
+export async function getSessionFromHeaders(
+  h: Headers,
+): Promise<{ session: Session; tokenHash: Buffer } | null> {
+  const cookie = h.get("cookie");
+  if (!cookie) return null;
+  const req = new Request("http://interno.local/", { headers: { cookie } });
+  const session = await getSession(req);
+  const tokenHash = tokenHashOf(req);
+  return session && tokenHash ? { session, tokenHash } : null;
+}

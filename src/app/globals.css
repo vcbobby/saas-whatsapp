@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/* Tokens tomados de docs/DESIGN.md (estilo, no marca). */
+@theme {
+  --color-obsidian-shell: #132322;
+  --color-pure-white: #ffffff;
+  --color-mint-frost: #edf7f5;
+  --color-deep-abyss: #0e1a19;
+  --color-charcoal: #070f0f;
+  --color-fog-border: #d0d3d3;
+  --color-stone-border: #b2b6b4;
+  --color-neon-pulse: #3ddc91;
+  --color-mint-whisper: #97ddbc;
+  --color-signal-yellow: #ffcd48;
+
+  /* Ajustes de contraste propios (ver notas del Paso 5B):
+     - gris de texto sobre tarjetas claras: 8.4:1 (el original daba 3.3:1)
+     - borde de campos: 4.3:1 contra blanco
+     - rojo solo para errores, nunca decorativo */
+  --color-ink: #132322;
+  --color-ink-muted: #3d4a49;
+  --color-field-border: #6f7d7c;
+  --color-danger-on-light: #a8201a;
+  --color-danger-on-dark: #ff9a92;
+  --color-ok-bg: #cfeedd;
+  --color-ok-text: #0b5a39;
+
+  --radius-pill: 56px;
+  --radius-card: 20px;
+  --radius-card-lg: 32px;
+  --radius-small: 10px;
+  --shadow-card: rgba(0, 0, 0, 0.04) 1px 0 9px 2px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-obsidian-shell);
+}
+
+body {
+  background: var(--color-obsidian-shell);
+  color: var(--color-pure-white);
+  font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.08px;
+  font-weight: 400;
+  font-feature-settings: "ss01" on, "cv11" on;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+/* ---------- etiquetas pequeñas (mínimo 12px, a diferencia de los 9px originales) */
+.eyebrow {
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+.on-dark .eyebrow, .eyebrow--dark { color: var(--color-neon-pulse); }
+.card-light .eyebrow { color: var(--color-ink); }
+
+/* ---------- botones: siempre píldora de 56px */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 28px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid transparent;
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: -0.08px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn-primary { background: var(--color-neon-pulse); color: var(--color-obsidian-shell); }
+.btn-primary:hover:not(:disabled) { background: #5be8a6; }
+.btn-ghost-dark { border-color: var(--color-pure-white); color: var(--color-pure-white); background: transparent; }
+.btn-ghost-dark:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
+.btn-ghost-light { border-color: var(--color-ink); color: var(--color-ink); background: transparent; }
+.btn-ghost-light:hover:not(:disabled) { background: rgba(19, 35, 34, 0.07); }
+.btn-text { background: none; color: inherit; padding: 8px 12px; min-height: 40px; }
+.btn-text:hover { text-decoration: underline; }
+.btn-sm { min-height: 40px; padding: 8px 20px; font-size: 14px; }
+
+/* Foco visible: verde sobre fondos oscuros, tinta oscura sobre tarjetas claras
+   (el verde sobre claro no se ve). */
+:focus-visible { outline: 2px solid var(--color-neon-pulse); outline-offset: 3px; }
+.card-light :focus-visible { outline-color: var(--color-ink); }
+
+/* ---------- tarjetas */
+.card-light {
+  background: var(--color-mint-frost);
+  color: var(--color-ink);
+  border-radius: var(--radius-card-lg);
+  padding: 40px;
+  box-shadow: var(--shadow-card);
+}
+.card-light .muted { color: var(--color-ink-muted); }
+.card-dark {
+  background: var(--color-deep-abyss);
+  border-radius: var(--radius-card);
+  padding: 24px;
+}
+.muted-dark { color: rgba(255, 255, 255, 0.78); }
+
+/* ---------- formularios */
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field label { font-size: 14px; color: var(--color-ink); }
+.field .hint { font-size: 13px; color: var(--color-ink-muted); }
+.input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 16px;
+  background: var(--color-pure-white);
+  color: var(--color-ink);
+  border: 1.5px solid var(--color-field-border);
+  border-radius: var(--radius-small);
+  font: inherit;
+  font-size: 16px;
+}
+.input::placeholder { color: #5c6968; }
+.input:focus { border-color: var(--color-ink); }
+.input[aria-invalid="true"] { border-color: var(--color-danger-on-light); }
+
+.alert-error {
+  background: var(--color-pure-white);
+  color: var(--color-danger-on-light);
+  border: 1.5px solid var(--color-danger-on-light);
+  border-radius: var(--radius-small);
+  padding: 12px 16px;
+  font-size: 14px;
+}
+.alert-warn {
+  background: var(--color-signal-yellow);
+  color: var(--color-ink);
+  border-radius: var(--radius-card);
+  padding: 14px 20px;
+  font-size: 14px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--color-ok-bg);
+  color: var(--color-ok-text);
+}
+.badge-neutral { background: rgba(255, 255, 255, 0.12); color: var(--color-pure-white); }
+
+.link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.card-light .link { color: var(--color-ink); font-weight: 500; }
+
+.container-app { width: 100%; max-width: 1200px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+
+@media (max-width: 640px) {
+  .card-light { padding: 24px; border-radius: var(--radius-card); }
+  .container-app { padding-left: 16px; padding-right: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
