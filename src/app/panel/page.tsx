@@ -30,6 +30,7 @@ async function PanelContent() {
   const auth = await getSessionFromHeaders(await headers());
   if (!auth) redirect("/entrar");
   const { session } = auth;
+  if (session.needsMfaSetup) redirect("/seguridad");
   const ctx = effectiveTenant(session);
 
   const tenant = ctx
@@ -60,6 +61,7 @@ async function PanelContent() {
         email={session.email}
         roleLabel={ctx ? (ctx.impersonating ? "Soporte" : ROLE_LABEL[ctx.role]) : "Súper admin"}
         showAdmin={session.isSuperAdmin}
+        showTeam={!!ctx && can(ctx.role, "team:manage")}
       />
 
       <main className="container-app flex-1 pb-24 pt-8">

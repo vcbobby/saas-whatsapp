@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
+import { MfaCodeForm } from "./MfaCodeForm";
 
 type Mode = "login" | "signup";
 
@@ -25,6 +26,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [needsCode, setNeedsCode] = useState(false);
   const copy = COPY[mode];
   const errorId = `${uid}-error`;
 
@@ -48,6 +50,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
+        const ok = (await res.clone().json().catch(() => null)) as { mfaRequired?: boolean } | null;
+        if (ok?.mfaRequired) {
+          setNeedsCode(true);
+          return;
+        }
         router.replace("/panel");
         router.refresh();
         return;
@@ -61,8 +68,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
     }
   }
 
+  if (needsCode) return <MfaCodeForm onRestart={() => setNeedsCode(false)} />;
+
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-6" aria-describedby={error ? errorId : undefined}>
+    <form onSubmit={onSubmit} noValidate={false} className="flex flex-col gap-6" aria-describedby={error ? errorId : undefined}>
       {mode === "signup" && (
         <div className="field">
           <label htmlFor={`${uid}-negocio`}>Nombre de tu negocio</label>

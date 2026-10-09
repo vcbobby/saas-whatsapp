@@ -6,6 +6,7 @@ const MATRIX = {
   "conversations:reply": ["owner", "admin", "agent"],
   "contacts:manage": ["owner", "admin"],
   "team:manage": ["owner", "admin"],
+  "team:roles": ["owner"],
   "settings:edit": ["owner", "admin"],
   "integrations:manage": ["owner", "admin"],
   "billing:manage": ["owner"],

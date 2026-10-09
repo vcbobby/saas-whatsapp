@@ -38,6 +38,7 @@ export const POST = route(async (req) => {
   }
 
   await pool.query("SELECT auth_login_ok($1)", [user.uid]);
-  const { setCookie } = await startSession(user.uid, req);
-  return jsonResponse({ ok: true }, 200, { "Set-Cookie": setCookie });
+  const { setCookie, pending } = await startSession(user.uid, req);
+  // Con 2FA activado la contraseña sola no basta: la sesión queda "pendiente" 10 min.
+  return jsonResponse({ ok: true, mfaRequired: pending }, 200, { "Set-Cookie": setCookie });
 });

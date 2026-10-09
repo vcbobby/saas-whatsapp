@@ -7,11 +7,6 @@ if (!url) {
   console.error("✖ Falta MIGRATION_DATABASE_URL.");
   process.exit(1);
 }
-if (["production", "staging"].includes(process.env.APP_ENV ?? "")) {
-  console.error("✖ Este script no se usa en producción hasta tener 2FA (Paso 5B).");
-  process.exit(1);
-}
-
 // Pregunta sin mostrar lo que se escribe.
 function ask(question, { hidden = false } = {}) {
   return new Promise((resolve) => {
@@ -55,6 +50,7 @@ try {
     [email, passwordHash],
   );
   console.log(`✔ Súper admin creado: ${email}`);
+  console.log("  Entra en la web y activa el 2FA en /seguridad: hasta entonces no tendrás poderes de súper admin.");
 } catch (err) {
   if (err.code === "23505") console.error("✖ Ya existe un usuario con ese correo.");
   else console.error("✖", err.message);
