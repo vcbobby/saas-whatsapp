@@ -104,7 +104,9 @@ async function PanelContent() {
               <article className="card-dark">
                 <p className="eyebrow eyebrow--dark">Paso 1</p>
                 <h2 className="mt-2 text-xl">Conecta tu WhatsApp</h2>
-                <p className="muted-dark mt-2 text-sm">Disponible en cuanto terminemos la integración con WhatsApp.</p>
+                <p className="muted-dark mt-2 text-sm">
+                  <Link href="/whatsapp" className="link">Conectar mi número</Link>
+                </p>
               </article>
               <article className="card-dark">
                 <p className="eyebrow eyebrow--dark">Paso 2</p>
