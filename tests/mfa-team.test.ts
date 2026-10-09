@@ -71,10 +71,13 @@ afterAll(async () => {
     const c = await owner.connect();
     try {
       await c.query("BEGIN");
+      // tenants tiene FORCE RLS: sin fijar el negocio el DELETE no borra nada (en silencio).
+      await c.query("SELECT set_config('app.tenant_id', $1, true)", [id]);
       await c.query("ALTER TABLE audit_log DISABLE TRIGGER audit_log_sin_cambios");
       await c.query("DELETE FROM audit_log WHERE tenant_id = $1", [id]);
       await c.query("ALTER TABLE audit_log ENABLE TRIGGER audit_log_sin_cambios");
-      await c.query("DELETE FROM tenants WHERE id = $1", [id]);
+      const del = await c.query("DELETE FROM tenants WHERE id = $1", [id]);
+      if (del.rowCount !== 1) throw new Error("La limpieza no borró el negocio de prueba " + id);
       await c.query("COMMIT");
     } catch (e) {
       await c.query("ROLLBACK");

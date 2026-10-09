@@ -89,3 +89,14 @@ export const inviteSignupSchema = z.object({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   password: passwordSchema,
 });
+
+// ---------------------------------------------------------------- WhatsApp
+export const whatsappConnectSchema = z.object({
+  phoneNumberId: z.string().trim().regex(/^\d{5,30}$/, "El ID del número son solo dígitos"),
+  accessToken: z
+    .string()
+    .trim()
+    .min(20, "El token es demasiado corto")
+    .max(1000)
+    .regex(/^\S+$/, "El token no debe llevar espacios"),
+});
