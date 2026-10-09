@@ -8,11 +8,13 @@ import { POST as login } from "@/app/api/auth/login/route";
 import { POST as logout } from "@/app/api/auth/logout/route";
 import { POST as logoutAll } from "@/app/api/auth/logout-all/route";
 import { POST as signup } from "@/app/api/auth/signup/route";
+import { POST as verify2fa } from "@/app/api/auth/2fa/verify/route";
 import { GET as me } from "@/app/api/me/route";
 import { buildClearCookie, buildSessionCookie, sessionCookieName } from "@/lib/auth/cookies";
 import { can, ROLES, type Permission } from "@/lib/auth/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getPool, withTenant } from "@/lib/db";
+import { codeFor, enableMfaDirect } from "./mfa-helpers";
 
 const ORIGIN = new URL(process.env.APP_URL!).origin;
 const RUN = randomUUID().slice(0, 8);
@@ -60,13 +62,18 @@ async function register(name: string) {
 
 async function makeSuperAdmin(name: string) {
   const addr = email(name);
-  await owner.query(
-    "INSERT INTO users (email, password_hash, is_super_admin) VALUES ($1, $2, true)",
+  const ins = await owner.query<{ id: string }>(
+    "INSERT INTO users (email, password_hash, is_super_admin) VALUES ($1, $2, true) RETURNING id",
     [addr, await hashPassword(PASSWORD)],
   );
+  // El súper admin exige 2FA: se activa directo en la base y se entra con código.
+  const secret = await enableMfaDirect(owner, ins.rows[0]!.id);
   const res = await login(post("/api/auth/login", { email: addr, password: PASSWORD }));
   expect(res.status).toBe(200);
-  return { cookie: cookieOf(res), email: addr, res };
+  expect((await res.clone().json()).mfaRequired).toBe(true);
+  const ver = await verify2fa(post("/api/auth/2fa/verify", { code: codeFor(secret) }, cookieOf(res)));
+  expect(ver.status).toBe(200);
+  return { cookie: cookieOf(ver), email: addr, res: ver, userId: ins.rows[0]!.id, secret };
 }
 
 async function limpiarAuditoria(tenantId: string) {

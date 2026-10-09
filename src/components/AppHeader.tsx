@@ -8,7 +8,17 @@ export const ROLE_LABEL: Record<string, string> = {
   agent: "Agente",
 };
 
-export function AppHeader({ email, roleLabel, showAdmin }: { email: string; roleLabel?: string; showAdmin?: boolean }) {
+export function AppHeader({
+  email,
+  roleLabel,
+  showAdmin,
+  showTeam,
+}: {
+  email: string;
+  roleLabel?: string;
+  showAdmin?: boolean;
+  showTeam?: boolean;
+}) {
   return (
     <header className="container-app flex min-h-20 flex-wrap items-center justify-between gap-4 py-4">
       <Link href="/panel" className="text-lg font-medium" style={{ letterSpacing: "-0.01em" }}>
@@ -20,6 +30,14 @@ export function AppHeader({ email, roleLabel, showAdmin }: { email: string; role
             Administración
           </Link>
         )}
+        {showTeam && (
+          <Link href="/equipo" className="btn btn-text btn-sm">
+            Equipo
+          </Link>
+        )}
+        <Link href="/seguridad" className="btn btn-text btn-sm">
+          Seguridad
+        </Link>
         <span className="muted-dark text-sm">{email}</span>
         {roleLabel && <span className="badge badge-neutral">{roleLabel}</span>}
         <LogoutButton />

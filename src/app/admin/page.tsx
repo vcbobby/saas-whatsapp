@@ -27,6 +27,7 @@ export default function AdminPage() {
 async function AdminContent() {
   const auth = await getSessionFromHeaders(await headers());
   if (!auth) redirect("/entrar");
+  if (auth.session.needsMfaSetup) redirect("/seguridad"); // súper admin sin 2FA
   if (!auth.session.isSuperAdmin) notFound(); // para el resto, esta página "no existe"
 
   const r = await getPool().query("SELECT * FROM admin_list_tenants($1)", [auth.tokenHash]);

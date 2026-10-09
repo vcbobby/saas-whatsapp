@@ -8,7 +8,12 @@ export const GET = route(async (req) => {
   const s = auth.session;
   const ctx = effectiveTenant(s);
   return jsonResponse({
-    user: { email: s.email, isSuperAdmin: s.isSuperAdmin },
+    user: {
+      email: s.email,
+      isSuperAdmin: s.isSuperAdmin,
+      mfaEnabled: s.mfaEnabled,
+      needsMfaSetup: s.needsMfaSetup,
+    },
     tenant: ctx
       ? {
           id: ctx.tenantId,

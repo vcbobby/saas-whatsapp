@@ -45,7 +45,7 @@ export const tenantStatusSchema = z.object({
 export function makeSlug(name: string, randomSuffix: string): string {
   const base = name
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -53,3 +53,39 @@ export function makeSlug(name: string, randomSuffix: string): string {
     .replace(/-+$/g, "");
   return `${base || "negocio"}-${randomSuffix}`;
 }
+
+// ---------------------------------------------------------------- 2FA y equipo
+export const totpCodeSchema = z.string().trim().regex(/^\d{3}\s?\d{3}$/, "El código tiene 6 dígitos");
+
+export const mfaVerifySchema = z.union([
+  z.object({ code: totpCodeSchema }),
+  z.object({ recoveryCode: z.string().trim().min(15).max(24) }),
+]);
+
+export const mfaConfirmSchema = z.object({ code: totpCodeSchema });
+
+export const mfaSensitiveSchema = z.object({
+  password: z.string().min(1).max(128),
+  code: totpCodeSchema,
+});
+
+export const inviteSchema = z.object({
+  email: emailSchema,
+  role: z.enum(["admin", "agent"]),
+});
+
+export const invitationIdSchema = z.object({ invitationId: z.uuid() });
+
+export const roleChangeSchema = z.object({
+  userId: z.uuid(),
+  role: z.enum(["admin", "agent"]),
+});
+
+export const removeMemberSchema = z.object({ userId: z.uuid() });
+
+export const inviteTokenSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) });
+
+export const inviteSignupSchema = z.object({
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  password: passwordSchema,
+});
