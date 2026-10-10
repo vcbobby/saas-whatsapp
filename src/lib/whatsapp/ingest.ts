@@ -3,6 +3,8 @@ import type { TenantBatch } from "./payload";
 
 export interface IngestResult {
   newMessages: number;
+  /** Mensajes entrantes NUEVOS que hay que encolar para el agente. */
+  inbound: { tenantId: string; messageId: string }[];
   statusUpdates: number;
   unknownNumber: boolean;
 }
@@ -18,11 +20,12 @@ export async function ingestBatch(batch: TenantBatch): Promise<IngestResult> {
   );
   const tenantId = r.rows[0]?.resolve_tenant_by_phone_number_id;
   // Número que no es de ningún cliente: se ignora (pero se responde 200 para que Meta no reintente).
-  if (!tenantId) return { newMessages: 0, statusUpdates: 0, unknownNumber: true };
+  if (!tenantId) return { newMessages: 0, inbound: [], statusUpdates: 0, unknownNumber: true };
 
   return withTenant(tenantId, async (db) => {
     let newMessages = 0;
     let statusUpdates = 0;
+    const inbound: { tenantId: string; messageId: string }[] = [];
 
     for (const m of batch.messages) {
       const contact = await db.query<{ id: string }>(
@@ -46,14 +49,15 @@ export async function ingestBatch(batch: TenantBatch): Promise<IngestResult> {
       const conversationId = conv.rows[0]!.id;
 
       const ins = await db.query(
-        `INSERT INTO messages (tenant_id, conversation_id, direction, wa_message_id, msg_type, body, created_at)
-         VALUES ($1, $2, 'in', $3, $4, $5, $6)
+        `INSERT INTO messages (tenant_id, conversation_id, direction, wa_message_id, msg_type, body, created_at, process_state)
+         VALUES ($1, $2, 'in', $3, $4, $5, $6, 'pending')
          ON CONFLICT (tenant_id, wa_message_id) DO NOTHING
          RETURNING id`,
         [tenantId, conversationId, m.waMessageId, m.type, m.body, m.at],
       );
       if (ins.rowCount) {
         newMessages++;
+        inbound.push({ tenantId, messageId: ins.rows[0].id });
         await db.query(
           `UPDATE conversations SET last_message_at = GREATEST(COALESCE(last_message_at, $3), $3)
            WHERE tenant_id = $1 AND id = $2`,
@@ -73,6 +77,6 @@ export async function ingestBatch(batch: TenantBatch): Promise<IngestResult> {
       );
       statusUpdates += u.rowCount ?? 0;
     }
-    return { newMessages, statusUpdates, unknownNumber: false };
+    return { newMessages, inbound, statusUpdates, unknownNumber: false };
   });
 }

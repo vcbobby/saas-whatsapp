@@ -1,5 +1,6 @@
 import { getWhatsAppEnv } from "@/lib/env";
 import { errorResponse, route } from "@/lib/auth/http";
+import { enqueueInbound } from "@/lib/queue/producer";
 import { ingestBatch } from "@/lib/whatsapp/ingest";
 import { parseWebhook } from "@/lib/whatsapp/payload";
 import { readRawBody, safeEqualText, verifySignature } from "@/lib/whatsapp/signature";
@@ -48,12 +49,24 @@ export const POST = route(async (req) => {
   const batches = parseWebhook(json);
   if (!batches) return plain("ignored"); // formato que no es de mensajes: 200 para que Meta no reintente
 
-  // Si algo falla aquí, route() responde 500 y Meta reintenta; el índice único evita duplicados.
+  // 1) Guardar en Postgres (fuente de verdad). Si falla, route() responde 500 y Meta reintenta;
+  //    el índice único evita duplicados.
+  const porEncolar: { tenantId: string; messageId: string }[] = [];
   for (const batch of batches) {
     const r = await ingestBatch(batch);
     if (r.unknownNumber) {
       console.warn(`[webhook] llegó un mensaje para el número ${batch.phoneNumberId}, que no está conectado a ningún negocio`);
     }
+    porEncolar.push(...r.inbound);
+  }
+
+  // 2) Avisar al worker. Si Redis falla NO se devuelve error: el mensaje ya está guardado como
+  //    "pending" y el barrendero del worker lo recupera. Devolver 500 solo haría que Meta reintente
+  //    en vano (el mensaje ya existe y no se volvería a encolar).
+  try {
+    await enqueueInbound(porEncolar);
+  } catch (err) {
+    console.error(`[webhook] no se pudo encolar (${porEncolar.length} mensajes quedan pendientes):`, err instanceof Error ? err.message : err);
   }
   return plain("ok");
 });
