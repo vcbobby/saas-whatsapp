@@ -31,9 +31,15 @@ export function AppHeader({
           </Link>
         )}
         {showTeam && (
-          <Link href="/equipo" className="btn btn-text btn-sm">
-            Equipo
-          </Link>
+          // Quien puede gestionar el equipo (dueño y administrador) también gestiona el asistente.
+          <>
+            <Link href="/agente" className="btn btn-text btn-sm">
+              Asistente
+            </Link>
+            <Link href="/equipo" className="btn btn-text btn-sm">
+              Equipo
+            </Link>
+          </>
         )}
         <Link href="/seguridad" className="btn btn-text btn-sm">
           Seguridad

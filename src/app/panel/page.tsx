@@ -111,7 +111,9 @@ async function PanelContent() {
               <article className="card-dark">
                 <p className="eyebrow eyebrow--dark">Paso 2</p>
                 <h2 className="mt-2 text-xl">Cuéntale a tu agente cómo atiendes</h2>
-                <p className="muted-dark mt-2 text-sm">Horarios, servicios y preguntas frecuentes.</p>
+                <p className="muted-dark mt-2 text-sm">
+                  Horarios, servicios y preguntas frecuentes. <Link href="/agente" className="link">Configurar el asistente</Link>
+                </p>
               </article>
               <article className="card-dark">
                 <p className="eyebrow eyebrow--dark">Paso 3</p>

@@ -52,3 +52,47 @@ export function getWhatsAppEnv() {
   }
   return result.data;
 }
+
+// ---------------------------------------------------------------------- IA
+// Aparte para que solo el worker y la página del agente exijan estas variables.
+const llmSchema = z
+  .object({
+    // "mock" no llama a ningún servicio: responde un texto fijo (solo para desarrollo).
+    LLM_PROVIDER: z.enum(["mock", "gemini", "anthropic", "openai"]).default("mock"),
+    LLM_MODEL: z.string().trim().max(100).optional(),
+    LLM_API_KEY: z.string().trim().min(10).max(500).optional(),
+    // Solo para "openai" (OpenRouter, Groq, etc.): URL base de la API compatible.
+    LLM_BASE_URL: z.string().trim().max(200).optional(),
+    AGENT_DAILY_REPLY_LIMIT: z.coerce.number().int().min(1).max(100_000).default(300),
+    AGENT_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(40).default(12),
+    APP_ENV: z.enum(["local", "test", "staging", "production"]),
+  })
+  .superRefine((v, ctx) => {
+    if (v.LLM_PROVIDER === "mock") {
+      if (v.APP_ENV === "production" || v.APP_ENV === "staging") {
+        ctx.addIssue({ code: "custom", path: ["LLM_PROVIDER"], message: "El modo de prueba (mock) no se permite en staging ni producción" });
+      }
+      return;
+    }
+    if (!v.LLM_MODEL) ctx.addIssue({ code: "custom", path: ["LLM_MODEL"], message: "Falta LLM_MODEL" });
+    if (!v.LLM_API_KEY) ctx.addIssue({ code: "custom", path: ["LLM_API_KEY"], message: "Falta LLM_API_KEY" });
+    if (v.LLM_PROVIDER === "openai") {
+      let ok = false;
+      try {
+        const u = new URL(v.LLM_BASE_URL ?? "");
+        ok = u.protocol === "https:" && !u.username && !u.password && !u.search && !u.hash;
+      } catch {}
+      if (!ok) ctx.addIssue({ code: "custom", path: ["LLM_BASE_URL"], message: "LLM_BASE_URL debe ser una URL https sin credenciales" });
+    }
+  });
+
+export type LlmEnv = z.infer<typeof llmSchema>;
+
+export function getLlmEnv(): LlmEnv {
+  const result = llmSchema.safeParse(process.env);
+  if (!result.success) {
+    const campos = result.error.issues.map((i) => `${i.path.join(".")} (${i.message})`).join(", ");
+    throw new Error(`Variables de IA inválidas o faltantes: ${campos}`);
+  }
+  return result.data;
+}
