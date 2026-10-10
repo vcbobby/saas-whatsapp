@@ -49,3 +49,7 @@ next-env.d.ts
 .secrets/
 
 .paso9a-backup/
+
+.simulador-backup/
+
+.paso9b-backup/

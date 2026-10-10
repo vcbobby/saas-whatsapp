@@ -6,13 +6,15 @@ import { getLlmEnv } from "@/lib/env";
 import { withLock } from "@/lib/queue/lock";
 import type { InboundJob } from "@/lib/queue/producer";
 import { sendText } from "@/lib/whatsapp/graph";
-import { FIXED, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply, type HistoryRow } from "./prompt";
+import { FIXED, RULES_LINES, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply, type HistoryRow } from "./prompt";
+import { allowedContacts, checkOutput, looksLikeInjection, newCanary } from "./safety";
 
 export type AgentOutcome =
   | "replied"
   | "handoff"
   | "already_replied"
   | "limit_reached"
+  | "contact_limited"
   | "send_failed"
   | "send_unknown"
   | "skipped_not_found"
@@ -36,6 +38,7 @@ const IGNORED_TYPES = new Set(["reaction"]);
 interface Ctx {
   messageId: string;
   conversationId: string;
+  contactId: string;
   msgType: string;
   body: string | null;
   convStatus: string;
@@ -54,7 +57,7 @@ interface Ctx {
 async function loadContext(job: InboundJob): Promise<Ctx | null> {
   return withTenant(job.tenantId, async (db) => {
     const r = await db.query(
-      `SELECT m.id AS message_id, m.conversation_id, m.msg_type, m.body,
+      `SELECT m.id AS message_id, m.conversation_id, c.contact_id, m.msg_type, m.body,
               c.status AS conv_status, ct.wa_id,
               t.name AS tenant_name, t.status AS tenant_status, t.trial_ends_at,
               COALESCE(a.enabled, false) AS enabled,
@@ -73,7 +76,7 @@ async function loadContext(job: InboundJob): Promise<Ctx | null> {
     const x = r.rows[0];
     if (!x) return null;
     return {
-      messageId: x.message_id, conversationId: x.conversation_id, msgType: x.msg_type, body: x.body,
+      messageId: x.message_id, conversationId: x.conversation_id, contactId: x.contact_id, msgType: x.msg_type, body: x.body,
        convStatus: x.conv_status, waId: x.wa_id,
       tenantName: x.tenant_name, tenantStatus: x.tenant_status, trialEndsAt: x.trial_ends_at,
       enabled: x.enabled, assistantName: x.assistant_name, instructions: x.instructions,
@@ -87,6 +90,21 @@ function tenantActive(c: Ctx): boolean {
   if (c.tenantStatus === "trial") return !c.trialEndsAt || c.trialEndsAt.getTime() > Date.now();
   return false;
 }
+
+type EventKind = "inyeccion" | "fuga_prompt" | "salida_bloqueada" | "limite_contacto";
+
+/** Anota un incidente (solo tipo, mensaje y conversación; nunca el texto). Un reintento no lo duplica. */
+async function recordEvent(tenantId: string, conversationId: string, messageId: string, kind: EventKind) {
+  await withTenant(tenantId, (db) =>
+    db.query(
+      "INSERT INTO agent_events (tenant_id, conversation_id, message_id, kind) VALUES ($1, $2, $3, $4) ON CONFLICT (tenant_id, message_id, kind) DO NOTHING",
+      [tenantId, conversationId, messageId, kind],
+    ),
+  );
+}
+
+/** Tras este número de mensajes de manipulación en una conversación, se deja de gastar IA y pasa a una persona. */
+const INJECTION_STRIKES = 3;
 
 async function handoff(tenantId: string, conversationId: string, reason: string) {
   await withTenant(tenantId, (db) =>
@@ -138,6 +156,15 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
 
   if (ctx.convStatus !== "bot") return "skipped_human";
 
+  // Intentos de manipulación: se registran y, si la persona insiste, se corta antes de gastar IA.
+  if (looksLikeInjection(ctx.body)) {
+    await recordEvent(tenantId, ctx.conversationId, ctx.messageId, "inyeccion");
+  }
+  const strikes = await withTenant(tenantId, async (db) => {
+    const r = await db.query("SELECT count(*)::int AS n FROM agent_events WHERE tenant_id = $1 AND conversation_id = $2 AND kind = 'inyeccion'", [tenantId, ctx.conversationId]);
+    return r.rows[0].n as number;
+  });
+
   // Si el cliente ya escribió algo más reciente, esa otra tarea responderá con todo el contexto.
   const newer = await withTenant(tenantId, async (db) => {
     const r = await db.query(
@@ -165,12 +192,36 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
     return "limit_reached";
   }
 
+  // Tope por cliente: cuántas respuestas del asistente recibió esta persona en la última hora y en las últimas 24 horas.
+  const perContact = await withTenant(tenantId, async (db) => {
+    const r = await db.query(
+      `SELECT count(*) FILTER (WHERE m.created_at >= now() - interval '1 hour')::int AS hora,
+              count(*)::int AS dia
+         FROM messages m JOIN conversations c ON c.tenant_id = m.tenant_id AND c.id = m.conversation_id
+        WHERE m.tenant_id = $1 AND c.contact_id = $2 AND m.direction = 'out' AND m.reply_to IS NOT NULL
+          AND m.send_state <> 'failed' AND m.created_at >= now() - interval '24 hours'`,
+      [tenantId, ctx.contactId],
+    );
+    return r.rows[0] as { hora: number; dia: number };
+  });
+  const contactLimited = perContact.hora >= env.AGENT_CONTACT_HOURLY_LIMIT || perContact.dia >= env.AGENT_CONTACT_DAILY_LIMIT;
+
   // Qué responder.
   let text: string;
   let wantsHandoff = false;
+  let handoffReason = "pedido_de_persona";
   let usage = { input: 0, output: 0 };
   if (!(TEXT_TYPES.has(ctx.msgType) && ctx.body)) {
     text = FIXED.nonText;
+  } else if (contactLimited) {
+    await recordEvent(tenantId, ctx.conversationId, ctx.messageId, "limite_contacto");
+    text = FIXED.rateLimited;
+    wantsHandoff = true;
+    handoffReason = "limite_contacto";
+  } else if (strikes >= INJECTION_STRIKES) {
+    text = FIXED.handoff;
+    wantsHandoff = true;
+    handoffReason = "intentos_de_manipulacion";
   } else if (customerWantsHuman(ctx.body)) {
     text = FIXED.handoff;
     wantsHandoff = true;
@@ -186,16 +237,25 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
       return (r.rows as HistoryRow[]).reverse();
     });
     const llm = deps.llm ?? getLlmProvider();
+    const canary = newCanary();
     const out = await llm.generate({
-      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions }),
+      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, canary }),
       messages: buildTurns(history),
       maxTokens: LLM_MAX_TOKENS,
     });
     usage = { input: out.inputTokens, output: out.outputTokens };
     const parsed = parseReply(out.text);
-    if (!parsed.text) {
+    // Revisión de salida: si el modelo filtró sus reglas o inventó enlaces/correos, NO se envía; pasa a una persona.
+    const verdict = checkOutput(parsed.text, { canary, rulesLines: RULES_LINES, allowed: allowedContacts(ctx.instructions) });
+    if (!verdict.ok) {
+      await recordEvent(tenantId, ctx.conversationId, ctx.messageId, verdict.kind);
       text = FIXED.fallback;
       wantsHandoff = true;
+      handoffReason = verdict.kind === "fuga_prompt" ? "fuga_de_instrucciones" : "salida_bloqueada";
+    } else if (!parsed.text) {
+      text = FIXED.fallback;
+      wantsHandoff = true;
+      handoffReason = "respuesta_vacia";
     } else {
       text = parsed.text;
       wantsHandoff = parsed.handoff;
@@ -240,7 +300,7 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
         );
       });
       if (wantsHandoff) {
-        await handoff(tenantId, ctx.conversationId, "pedido_de_persona");
+        await handoff(tenantId, ctx.conversationId, handoffReason);
         return "handoff";
       }
       return "replied";

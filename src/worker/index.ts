@@ -1,5 +1,6 @@
 import { Worker } from "bullmq";
 import { getPool } from "@/lib/db";
+import { getLlmEnv, getSendMode } from "@/lib/env";
 import { QUEUE_NAME, createWorkerConnection, queuePrefix } from "@/lib/queue/connection";
 import { closeLockClient } from "@/lib/queue/lock";
 import { closeProducer } from "@/lib/queue/producer";
@@ -60,4 +61,8 @@ async function shutdown(signal: string) {
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
+const sendMode = getSendMode();
+const llmProvider = getLlmEnv().LLM_PROVIDER;
+if (sendMode === "simulate") console.warn("[worker] ⚠ MODO SIMULACIÓN: las respuestas NO se envían a WhatsApp (solo se ven en /simulador).");
+if (llmProvider === "mock") console.warn("[worker] ⚠ IA en modo de prueba (mock): se responde con un texto fijo, no hay modelo conectado.");
 console.log(`[worker] listo: escuchando la cola "${QUEUE_NAME}" (concurrencia ${CONCURRENCY})`);

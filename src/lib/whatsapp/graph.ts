@@ -1,4 +1,5 @@
-import { getWhatsAppEnv } from "@/lib/env";
+import { randomUUID } from "node:crypto";
+import { getSendMode, getWhatsAppEnv } from "@/lib/env";
 
 export interface PhoneInfo {
   displayPhoneNumber: string;
@@ -64,6 +65,8 @@ export async function sendText(
   if (!/^\d{5,30}$/.test(phoneNumberId)) return { kind: "rejected", status: 0, code: null, message: "ID de número inválido" };
   if (!/^\d{5,32}$/.test(to)) return { kind: "rejected", status: 0, code: null, message: "Número de destino inválido" };
   if (body.length === 0 || body.length > 4096) return { kind: "rejected", status: 0, code: null, message: "Texto vacío o demasiado largo" };
+  // Modo simulación (solo desarrollo): no se contacta a Meta; el mensaje queda como enviado.
+  if (getSendMode() === "simulate") return { kind: "sent", waMessageId: `wamid.SIM.${randomUUID()}` };
   const { WHATSAPP_GRAPH_VERSION } = getWhatsAppEnv();
   let res: Response;
   try {
