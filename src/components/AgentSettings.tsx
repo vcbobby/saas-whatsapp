@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 
@@ -12,6 +13,10 @@ export interface AgentSettingsProps {
   mockMode: boolean;
   repliesToday: number;
   dailyLimit: number;
+  /** Solo en desarrollo: muestra el enlace al simulador. */
+  simulatorLink?: boolean;
+  /** Solo en desarrollo: las respuestas no salen a WhatsApp. */
+  simulateMode?: boolean;
 }
 
 export function AgentSettings(p: AgentSettingsProps) {
@@ -57,7 +62,17 @@ export function AgentSettings(p: AgentSettingsProps) {
       <p className="eyebrow">Asistente</p>
       <h2 className="mt-3 text-[28px]">Tu asistente de WhatsApp</h2>
 
-      {!p.whatsappConnected && (
+      {p.simulateMode && (
+        <p className="alert-warn mt-4" role="status">
+          Modo simulación: las respuestas NO se envían a WhatsApp. Pruébalas en el simulador.
+        </p>
+      )}
+      {p.simulatorLink && (
+        <p className="mt-4">
+          <Link href="/simulador" className="link">Probar en el simulador →</Link>
+        </p>
+      )}
+      {!p.whatsappConnected && !p.simulateMode && (
         <p className="alert-warn mt-4" role="status">
           Aún no conectaste tu número de WhatsApp. El asistente solo responde cuando hay un número conectado.
         </p>

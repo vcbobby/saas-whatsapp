@@ -9,7 +9,8 @@ export default defineConfig(({ mode }) => ({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    env: { ...loadEnv(mode, process.cwd(), ""), QUEUE_PREFIX: "test" },
+    // Las pruebas no dependen de tu .env.local: siempre en modo "meta" (los de simulador lo cambian a propósito).
+    env: { ...loadEnv(mode, process.cwd(), ""), QUEUE_PREFIX: "test", WHATSAPP_SEND_MODE: "meta" },
     globalSetup: ["tests/global-setup.ts"],
     fileParallelism: false,
     testTimeout: 20_000,

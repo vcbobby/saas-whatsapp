@@ -64,6 +64,9 @@ const llmSchema = z
     // Solo para "openai" (OpenRouter, Groq, etc.): URL base de la API compatible.
     LLM_BASE_URL: z.string().trim().max(200).optional(),
     AGENT_DAILY_REPLY_LIMIT: z.coerce.number().int().min(1).max(100_000).default(300),
+    // Tope de respuestas del asistente a UN mismo cliente (contacto): evita que una persona gaste tu IA.
+    AGENT_CONTACT_HOURLY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(20),
+    AGENT_CONTACT_DAILY_LIMIT: z.coerce.number().int().min(1).max(100_000).default(60),
     AGENT_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(40).default(12),
     APP_ENV: z.enum(["local", "test", "staging", "production"]),
   })
@@ -95,4 +98,33 @@ export function getLlmEnv(): LlmEnv {
     throw new Error(`Variables de IA inválidas o faltantes: ${campos}`);
   }
   return result.data;
+}
+
+// ----------------------------------------------------- modo de envío (simulador)
+const sendModeSchema = z
+  .object({
+    // "meta": se envía de verdad por WhatsApp. "simulate": NO se envía nada; sirve para probar en tu computadora.
+    WHATSAPP_SEND_MODE: z.enum(["meta", "simulate"]).default("meta"),
+    APP_ENV: z.enum(["local", "test", "staging", "production"]),
+  })
+  .superRefine((v, ctx) => {
+    if (v.WHATSAPP_SEND_MODE === "simulate" && (v.APP_ENV === "staging" || v.APP_ENV === "production")) {
+      ctx.addIssue({ code: "custom", path: ["WHATSAPP_SEND_MODE"], message: "El modo simulate no se permite en staging ni producción" });
+    }
+  });
+
+/** Aparte de getWhatsAppEnv(): para simular no hacen falta los secretos de Meta. */
+export function getSendMode(): "meta" | "simulate" {
+  const result = sendModeSchema.safeParse(process.env);
+  if (!result.success) {
+    const campos = result.error.issues.map((i) => `${i.path.join(".")} (${i.message})`).join(", ");
+    throw new Error(`Modo de envío inválido: ${campos}`);
+  }
+  return result.data.WHATSAPP_SEND_MODE;
+}
+
+/** Herramientas de desarrollo (simulador). Solo en computadoras de desarrollo, nunca en servidores. */
+export function devToolsEnabled(): boolean {
+  const env = process.env.APP_ENV;
+  return env === "local" || env === "test";
 }

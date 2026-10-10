@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import { AgentSettings } from "@/components/AgentSettings";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
 import { withTenant } from "@/lib/db";
-import { getLlmEnv } from "@/lib/env";
+import { devToolsEnabled, getLlmEnv, getSendMode } from "@/lib/env";
 import { can } from "@/lib/auth/permissions";
 import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
 
@@ -64,6 +64,8 @@ async function AgentContent() {
             mockMode={llm.LLM_PROVIDER === "mock"}
             repliesToday={data.replies}
             dailyLimit={llm.AGENT_DAILY_REPLY_LIMIT}
+            simulatorLink={devToolsEnabled()}
+            simulateMode={devToolsEnabled() && getSendMode() === "simulate"}
           />
         </div>
       </main>
