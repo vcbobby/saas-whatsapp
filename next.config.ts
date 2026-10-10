@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     agentFeedback: true,
   },
   cacheComponents: true,
+  // Estos paquetes cargan archivos propios (scripts Lua): no deben empaquetarse.
+  serverExternalPackages: ["bullmq", "ioredis"],
   partialPrefetching: true,
   turbopack: {
     rules: {

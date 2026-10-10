@@ -23,5 +23,32 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: saas-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?falta REDIS_PASSWORD en .env.local}
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    # La contraseña se lee de una variable de entorno (no queda en la lista de procesos).
+    # noeviction: BullMQ exige que Redis nunca borre claves por falta de memoria.
+    # appendonly: los trabajos pendientes sobreviven a un reinicio.
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - saas_redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   saas_pgdata:
+  saas_redisdata:

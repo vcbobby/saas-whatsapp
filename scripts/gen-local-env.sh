@@ -13,8 +13,10 @@ SUPER=$(openssl rand -hex 24)
 OWNER=$(openssl rand -hex 24)
 APPPW=$(openssl rand -hex 24)
 KEY=$(openssl rand -base64 32)
+REDISPW=$(openssl rand -hex 24)
 
 sed -i '/^DATABASE_URL=/d' "$FILE"
+sed -i '/^REDIS_URL=/d' "$FILE"
 
 cat >> "$FILE" <<EOT
 
@@ -30,6 +32,8 @@ DB_POOL_MAX=10
 DB_SSL=false
 ENCRYPTION_KEY_1=$KEY
 ENCRYPTION_CURRENT_VERSION=1
+REDIS_PASSWORD=$REDISPW
+REDIS_URL=redis://:$REDISPW@127.0.0.1:6379
 EOT
 
 echo "✔ Claves locales generadas en $FILE (no se suben a git)."
