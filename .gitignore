@@ -47,3 +47,5 @@ next-env.d.ts
 *.pem
 *.key
 .secrets/
+
+.paso9a-backup/

@@ -100,3 +100,10 @@ export const whatsappConnectSchema = z.object({
     .max(1000)
     .regex(/^\S+$/, "El token no debe llevar espacios"),
 });
+
+// ------------------------------------------------------------------ agente
+export const agentSettingsSchema = z.object({
+  enabled: z.boolean(),
+  assistantName: z.string().trim().min(1, "Ponle un nombre al asistente").max(60, "Máximo 60 caracteres"),
+  instructions: z.string().max(4000, "Máximo 4000 caracteres"),
+});

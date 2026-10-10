@@ -42,10 +42,17 @@ export async function markInboundFailed(data: unknown): Promise<void> {
   const parsed = jobSchema.safeParse(data);
   if (!parsed.success) return;
   const job = parsed.data;
-  await withTenant(job.tenantId, (db) =>
-    db.query(
+  await withTenant(job.tenantId, async (db) => {
+    await db.query(
       "UPDATE messages SET process_state = 'failed', process_state_at = now() WHERE tenant_id = $1 AND id = $2 AND process_state = 'pending'",
       [job.tenantId, job.messageId],
-    ),
-  );
+    );
+    // Que una persona lo vea: el asistente no pudo con este mensaje.
+    await db.query(
+      `UPDATE conversations SET status = 'human', handoff_reason = 'agente_fallo'
+        WHERE tenant_id = $1 AND status = 'bot'
+          AND id = (SELECT conversation_id FROM messages WHERE tenant_id = $1 AND id = $2 AND process_state = 'failed')`,
+      [job.tenantId, job.messageId],
+    );
+  });
 }
