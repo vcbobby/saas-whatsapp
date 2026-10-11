@@ -1,5 +1,7 @@
 import type { ZodType } from "zod";
 import { getEnv } from "@/lib/env";
+import { clientIp } from "@/lib/security/client-ip";
+import { hitLimit, type PolicyName } from "@/lib/security/rate-limit";
 
 const BASE_HEADERS = {
   "Cache-Control": "no-store",
@@ -71,10 +73,24 @@ export async function readJson<T>(
   return { ok: true, data: parsed.data };
 }
 
-/** Envuelve una ruta: errores inesperados -> 500 genérico, sin filtrar detalles. */
-export function route(handler: (req: Request) => Promise<Response>) {
+/** 429: demasiadas peticiones desde la misma IP. */
+export function tooManyRequests(retryAfterSec: number): Response {
+  return errorResponse(429, "demasiadas_peticiones", "Demasiadas peticiones. Espera un momento e intenta de nuevo.", {
+    headers: { "Retry-After": String(retryAfterSec) },
+  });
+}
+
+/**
+ * Envuelve una ruta: límite de peticiones por IP y errores inesperados -> 500 genérico, sin filtrar detalles.
+ * `limit`: política de límite (por defecto "api"); `false` si la ruta se protege por su cuenta (webhook).
+ */
+export function route(handler: (req: Request) => Promise<Response>, opts: { limit?: PolicyName | false } = {}) {
   return async (req: Request): Promise<Response> => {
     try {
+      if (opts.limit !== false) {
+        const r = await hitLimit(opts.limit ?? "api", clientIp(req));
+        if (!r.allowed) return tooManyRequests(r.retryAfterSec);
+      }
       return await handler(req);
     } catch (err) {
       const e = err as { code?: string; message?: string; digest?: string };

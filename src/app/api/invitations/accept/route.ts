@@ -25,4 +25,4 @@ export const POST = route(async (req) => {
     throw err;
   }
   return jsonResponse({ ok: true });
-});
+}, { limit: "invite" });

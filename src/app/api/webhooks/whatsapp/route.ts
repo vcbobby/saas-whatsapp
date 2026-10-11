@@ -1,6 +1,8 @@
 import { getWhatsAppEnv } from "@/lib/env";
-import { errorResponse, route } from "@/lib/auth/http";
+import { errorResponse, route, tooManyRequests } from "@/lib/auth/http";
 import { enqueueInbound } from "@/lib/queue/producer";
+import { UNKNOWN_IP, clientIp } from "@/lib/security/client-ip";
+import { hitLimit, peekLimit } from "@/lib/security/rate-limit";
 import { ingestBatch } from "@/lib/whatsapp/ingest";
 import { parseWebhook } from "@/lib/whatsapp/payload";
 import { readRawBody, safeEqualText, verifySignature } from "@/lib/whatsapp/signature";
@@ -27,16 +29,27 @@ export const GET = route(async (req) => {
     safeEqualText(q.get("hub.verify_token") ?? "", env.WHATSAPP_VERIFY_TOKEN) &&
     /^[A-Za-z0-9_-]{1,200}$/.test(challenge);
   return ok ? plain(challenge) : plain("Forbidden", 403);
-});
+}, { limit: "api" });
 
 /** Mensajes y estados. Primero se comprueba la firma; sin firma válida no se toca nada. */
 export const POST = route(async (req) => {
   const env = getWhatsAppEnv();
+  // Quien ya mandó demasiadas firmas falsas desde su IP se corta antes de gastar nada en él.
+  // (Meta, que firma bien, nunca entra en este límite.)
+  // Sin una IP fiable (TRUSTED_PROXY=none) NO se castiga a nadie: todos compartirían cupo y un solo atacante
+  // dejaría fuera también a Meta.
+  const ip = clientIp(req);
+  const track = ip !== UNKNOWN_IP;
+  if (track) {
+    const prior = await peekLimit("badSignature", ip);
+    if (!prior.allowed) return tooManyRequests(prior.retryAfterSec);
+  }
   const raw = await readRawBody(req, MAX_BODY);
   if (!raw) return errorResponse(413, "cuerpo_muy_grande", "Petición demasiado grande.");
 
   if (!verifySignature(raw, req.headers.get("x-hub-signature-256"), env.WHATSAPP_APP_SECRET)) {
     console.warn("[webhook] firma inválida: revisa que WHATSAPP_APP_SECRET sea el de tu app de Meta");
+    if (track) await hitLimit("badSignature", ip);
     return errorResponse(401, "firma_invalida", "Firma inválida.");
   }
 
@@ -69,4 +82,4 @@ export const POST = route(async (req) => {
     console.error(`[webhook] no se pudo encolar (${porEncolar.length} mensajes quedan pendientes):`, err instanceof Error ? err.message : err);
   }
   return plain("ok");
-});
+}, { limit: false });

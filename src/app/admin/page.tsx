@@ -26,7 +26,8 @@ export default function AdminPage() {
 
 async function AdminContent() {
   const auth = await getSessionFromHeaders(await headers());
-  if (!auth) redirect("/entrar");
+  // Defensa en profundidad: el proxy ya responde 404 real a quien no es súper admin; aquí se repite la comprobación.
+  if (!auth) notFound();
   if (auth.session.needsMfaSetup) redirect("/seguridad"); // súper admin sin 2FA
   if (!auth.session.isSuperAdmin) notFound(); // para el resto, esta página "no existe"
 

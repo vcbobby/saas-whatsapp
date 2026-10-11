@@ -30,4 +30,4 @@ export const POST = route(async (req) => {
     }
     throw err;
   }
-});
+}, { limit: "invite" });
