@@ -165,3 +165,37 @@ export function getEmbeddingsEnv(): EmbeddingsEnv {
     modelDir: v.KB_MODEL_DIR ?? ".cache/models",
   };
 }
+
+// ------------------------------------------------------------ seguridad web (Paso 10)
+const securitySchema = z
+  .object({
+    // Quién está delante de la aplicación (de él depende poder fiarse de la IP del visitante):
+    // "none" (nadie), "cloudflare" (túnel/proxy de Cloudflare) o "proxy" (un nginx/Caddy tuyo).
+    TRUSTED_PROXY: z.enum(["none", "cloudflare", "proxy"]).optional(),
+    // "1" apaga los límites por IP. Solo para pruebas automáticas.
+    RATE_LIMIT_DISABLED: z.enum(["0", "1"]).default("0"),
+    APP_ENV: z.enum(["local", "test", "staging", "production"]),
+  })
+  .superRefine((v, ctx) => {
+    const hosted = v.APP_ENV === "staging" || v.APP_ENV === "production";
+    if (hosted && !v.TRUSTED_PROXY) {
+      ctx.addIssue({ code: "custom", path: ["TRUSTED_PROXY"], message: "Debes definirlo en staging y producción: none, cloudflare o proxy" });
+    }
+    if (hosted && v.RATE_LIMIT_DISABLED === "1") {
+      ctx.addIssue({ code: "custom", path: ["RATE_LIMIT_DISABLED"], message: "No se permite apagar los límites en staging ni producción" });
+    }
+  });
+
+export interface SecurityEnv {
+  trustedProxy: "none" | "cloudflare" | "proxy";
+  rateLimitDisabled: boolean;
+}
+
+export function getSecurityEnv(): SecurityEnv {
+  const result = securitySchema.safeParse(process.env);
+  if (!result.success) {
+    const campos = result.error.issues.map((i) => `${i.path.join(".")} (${i.message})`).join(", ");
+    throw new Error(`Configuración de seguridad inválida: ${campos}`);
+  }
+  return { trustedProxy: result.data.TRUSTED_PROXY ?? "none", rateLimitDisabled: result.data.RATE_LIMIT_DISABLED === "1" };
+}

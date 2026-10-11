@@ -57,3 +57,5 @@ next-env.d.ts
 .paso9c-backup/
 
 /.cache/
+
+.paso10-backup/

@@ -33,4 +33,4 @@ export const POST = route(async (req) => {
     }
   }
   return errorResponse(500, "error_interno", "Ocurrió un error. Intenta de nuevo.");
-});
+}, { limit: "signup" });

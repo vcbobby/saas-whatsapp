@@ -32,4 +32,4 @@ export const POST = route(async (req) => {
   return jsonResponse({ ok: true, codesLeft: outcome.codesLeft }, 200, {
     "Set-Cookie": outcome.setCookie,
   });
-});
+}, { limit: "mfa" });

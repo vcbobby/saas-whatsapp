@@ -109,6 +109,9 @@ describe("modo de envío y herramientas de desarrollo", () => {
   it("en production responde 404 aunque haya sesión válida", async () => {
     const t = await register("prod");
     vi.stubEnv("APP_ENV", "production");
+    // Una producción bien configurada (Paso 10): proxy declarado y límites encendidos.
+    vi.stubEnv("TRUSTED_PROXY", "none");
+    vi.stubEnv("RATE_LIMIT_DISABLED", "0");
     expect((await simGet(api("GET", t.cookie))).status).toBe(404);
     expect((await simPost(api("POST", t.cookie, { action: "send", text: "hola" }))).status).toBe(404);
   });
