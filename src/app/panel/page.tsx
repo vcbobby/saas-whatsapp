@@ -62,6 +62,7 @@ async function PanelContent() {
         roleLabel={ctx ? (ctx.impersonating ? "Soporte" : ROLE_LABEL[ctx.role]) : "Súper admin"}
         showAdmin={session.isSuperAdmin}
         showTeam={!!ctx && can(ctx.role, "team:manage")}
+        showWork={!!ctx}
       />
 
       <main className="container-app flex-1 pb-24 pt-8">
