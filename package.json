@@ -14,9 +14,12 @@
     "admin:create": "node --env-file=.env.local scripts/create-super-admin.mjs",
     "typecheck": "tsc --noEmit",
     "worker": "tsx --env-file=.env.local src/worker/index.ts",
-    "dev:all": "node scripts/dev-all.mjs"
+    "dev:all": "node scripts/dev-all.mjs",
+    "db:extensions": "docker compose --env-file .env.local exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -c \"CREATE EXTENSION IF NOT EXISTS vector\"'",
+    "kb:model": "tsx --env-file=.env.local scripts/kb-model.ts"
   },
   "dependencies": {
+    "@huggingface/transformers": "4.3.1",
     "@node-rs/argon2": "^2.2.2",
     "bullmq": "6.3.9",
     "ioredis": "6.0.0",

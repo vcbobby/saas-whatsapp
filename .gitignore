@@ -53,3 +53,7 @@ next-env.d.ts
 .simulador-backup/
 
 .paso9b-backup/
+
+.paso9c-backup/
+
+/.cache/

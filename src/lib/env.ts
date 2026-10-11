@@ -128,3 +128,40 @@ export function devToolsEnabled(): boolean {
   const env = process.env.APP_ENV;
   return env === "local" || env === "test";
 }
+
+// ------------------------------------------------- embeddings de la base de conocimiento (Paso 9C)
+const embeddingsSchema = z
+  .object({
+    // "local": modelo multilingüe que corre en tu propio servidor (gratis, sin enviar datos a nadie).
+    // "fake": vectores de prueba por palabras (solo desarrollo; la búsqueda no entiende sinónimos).
+    EMBEDDINGS_PROVIDER: z.enum(["fake", "local"]).default("fake"),
+    // "1" permite descargar el modelo desde Hugging Face. Por defecto solo en tu computadora.
+    EMBEDDINGS_ALLOW_DOWNLOAD: z.enum(["0", "1"]).optional(),
+    KB_MODEL_DIR: z.string().trim().min(1).max(300).optional(),
+    APP_ENV: z.enum(["local", "test", "staging", "production"]),
+  })
+  .superRefine((v, ctx) => {
+    if (v.EMBEDDINGS_PROVIDER === "fake" && (v.APP_ENV === "staging" || v.APP_ENV === "production")) {
+      ctx.addIssue({ code: "custom", path: ["EMBEDDINGS_PROVIDER"], message: "Los vectores de prueba (fake) no se permiten en staging ni producción" });
+    }
+  });
+
+export interface EmbeddingsEnv {
+  EMBEDDINGS_PROVIDER: "fake" | "local";
+  allowDownload: boolean;
+  modelDir: string;
+}
+
+export function getEmbeddingsEnv(): EmbeddingsEnv {
+  const result = embeddingsSchema.safeParse(process.env);
+  if (!result.success) {
+    const campos = result.error.issues.map((i) => `${i.path.join(".")} (${i.message})`).join(", ");
+    throw new Error(`Variables de embeddings inválidas: ${campos}`);
+  }
+  const v = result.data;
+  return {
+    EMBEDDINGS_PROVIDER: v.EMBEDDINGS_PROVIDER,
+    allowDownload: v.EMBEDDINGS_ALLOW_DOWNLOAD ? v.EMBEDDINGS_ALLOW_DOWNLOAD === "1" : v.APP_ENV === "local",
+    modelDir: v.KB_MODEL_DIR ?? ".cache/models",
+  };
+}

@@ -7,6 +7,8 @@ import { withLock } from "@/lib/queue/lock";
 import type { InboundJob } from "@/lib/queue/producer";
 import { sendText } from "@/lib/whatsapp/graph";
 import { FIXED, RULES_LINES, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply, type HistoryRow } from "./prompt";
+import { getEmbedder, type Embedder } from "@/lib/kb/embeddings";
+import { searchKnowledge, type Snippet } from "@/lib/kb/search";
 import { allowedContacts, checkOutput, looksLikeInjection, newCanary } from "./safety";
 
 export type AgentOutcome =
@@ -28,6 +30,8 @@ export type AgentOutcome =
 export interface AgentDeps {
   llm: LlmProvider;
   send: typeof sendText;
+  /** Para pruebas: el generador de vectores de la base de conocimiento. */
+  embedder: Embedder;
 }
 
 const LOCK_TTL_MS = 90_000; // mayor que IA (30 s) + envío (10 s) + base de datos
@@ -237,16 +241,24 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
       return (r.rows as HistoryRow[]).reverse();
     });
     const llm = deps.llm ?? getLlmProvider();
+    // Base de conocimiento: si falla (modelo no disponible), se responde sin ella en vez de fallar la respuesta.
+    let knowledge: Snippet[] = [];
+    try {
+      const questions = history.filter((h) => h.direction === "in" && h.msg_type === "text" && h.body).slice(-2).map((h) => h.body as string);
+      knowledge = await searchKnowledge(tenantId, questions.join("\n"), deps.embedder ?? getEmbedder());
+    } catch (err) {
+      console.error("[agente] base de conocimiento no disponible:", err instanceof Error ? err.message : err);
+    }
     const canary = newCanary();
     const out = await llm.generate({
-      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, canary }),
+      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, canary, knowledge }),
       messages: buildTurns(history),
       maxTokens: LLM_MAX_TOKENS,
     });
     usage = { input: out.inputTokens, output: out.outputTokens };
     const parsed = parseReply(out.text);
     // Revisión de salida: si el modelo filtró sus reglas o inventó enlaces/correos, NO se envía; pasa a una persona.
-    const verdict = checkOutput(parsed.text, { canary, rulesLines: RULES_LINES, allowed: allowedContacts(ctx.instructions) });
+    const verdict = checkOutput(parsed.text, { canary, rulesLines: RULES_LINES, allowed: allowedContacts([ctx.instructions, ...knowledge.map((k) => k.content)].join("\n")) });
     if (!verdict.ok) {
       await recordEvent(tenantId, ctx.conversationId, ctx.messageId, verdict.kind);
       text = FIXED.fallback;

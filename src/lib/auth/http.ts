@@ -40,6 +40,7 @@ const MAX_BODY_BYTES = 10_000;
 export async function readJson<T>(
   req: Request,
   schema: ZodType<T>,
+  opts: { maxChars?: number } = {},
 ): Promise<{ ok: true; data: T } | { ok: false; response: Response }> {
   const type = (req.headers.get("content-type") ?? "").toLowerCase();
   if (!type.startsWith("application/json")) {
@@ -49,7 +50,7 @@ export async function readJson<T>(
     };
   }
   const text = await req.text();
-  if (text.length > MAX_BODY_BYTES) {
+  if (text.length > (opts.maxChars ?? MAX_BODY_BYTES)) {
     return { ok: false, response: errorResponse(413, "cuerpo_muy_grande", "Petición demasiado grande.") };
   }
   let raw: unknown;

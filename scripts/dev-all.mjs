@@ -19,6 +19,8 @@ function run(cmd, args, label) {
 if (process.env.SKIP_DOCKER !== "1") {
   console.log("▶ Levantando Postgres y Redis (Docker)…");
   run("docker", ["compose", "--env-file", ".env.local", "up", "-d", "--wait", "db", "redis"], "docker compose (¿está abierto Docker Desktop?)");
+  // pgvector (base de conocimiento): crearlo necesita superusuario; es seguro repetirlo.
+  run("docker", ["compose", "--env-file", ".env.local", "exec", "-T", "db", "sh", "-c", 'psql -v ON_ERROR_STOP=1 -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS vector"'], "crear la extensión pgvector");
 }
 console.log("▶ Aplicando migraciones…");
 run("node", ["--env-file=.env.local", "scripts/migrate.mjs"], "migraciones");

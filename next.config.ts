@@ -2,12 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  experimental: {
-    agentFeedback: true,
-  },
   cacheComponents: true,
   // Estos paquetes cargan archivos propios (scripts Lua): no deben empaquetarse.
-  serverExternalPackages: ["bullmq", "ioredis"],
+  serverExternalPackages: ["bullmq", "ioredis", "@huggingface/transformers", "onnxruntime-node", "sharp"],
   partialPrefetching: true,
   turbopack: {
     rules: {

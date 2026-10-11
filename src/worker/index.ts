@@ -1,12 +1,13 @@
 import { Worker } from "bullmq";
 import { getPool } from "@/lib/db";
-import { getLlmEnv, getSendMode } from "@/lib/env";
+import { getEmbeddingsEnv, getLlmEnv, getSendMode } from "@/lib/env";
 import { QUEUE_NAME, createWorkerConnection, queuePrefix } from "@/lib/queue/connection";
 import { closeLockClient } from "@/lib/queue/lock";
 import { closeProducer } from "@/lib/queue/producer";
 import { processInbound } from "@/lib/queue/process";
 import { sweepPending } from "@/lib/queue/sweeper";
 import { createInboundHandler, onJobFailed } from "./handler";
+import { indexPending } from "./kb";
 
 const handler = createInboundHandler();
 
@@ -42,12 +43,29 @@ async function sweep() {
 void sweep();
 const timer = setInterval(sweep, SWEEP_EVERY_MS);
 
+// Indexado de documentos de la base de conocimiento (cada pocos segundos; la cola vive en Postgres).
+const KB_EVERY_MS = 5_000;
+let indexing = false;
+async function indexKb() {
+  if (indexing || closing) return;
+  indexing = true;
+  try {
+    await indexPending();
+  } catch (err) {
+    console.error("[worker] indexado de conocimiento falló:", err instanceof Error ? err.message : err);
+  } finally {
+    indexing = false;
+  }
+}
+const kbTimer = setInterval(() => void indexKb(), KB_EVERY_MS);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
   closing = true;
   console.log(`[worker] ${signal}: cerrando con calma…`);
   clearInterval(timer);
+  clearInterval(kbTimer);
   try {
     await worker.close();
     await closeProducer();
@@ -64,5 +82,6 @@ process.on("SIGTERM", () => void shutdown("SIGTERM"));
 const sendMode = getSendMode();
 const llmProvider = getLlmEnv().LLM_PROVIDER;
 if (sendMode === "simulate") console.warn("[worker] ⚠ MODO SIMULACIÓN: las respuestas NO se envían a WhatsApp (solo se ven en /simulador).");
+if (getEmbeddingsEnv().EMBEDDINGS_PROVIDER === "fake") console.warn("[worker] ⚠ Embeddings de prueba (fake): la búsqueda en documentos solo coincide por palabras, no por significado.");
 if (llmProvider === "mock") console.warn("[worker] ⚠ IA en modo de prueba (mock): se responde con un texto fijo, no hay modelo conectado.");
 console.log(`[worker] listo: escuchando la cola "${QUEUE_NAME}" (concurrencia ${CONCURRENCY})`);
