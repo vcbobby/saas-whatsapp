@@ -36,6 +36,9 @@ export function AppHeader({
             <Link href="/agente" className="btn btn-text btn-sm">
               Asistente
             </Link>
+            <Link href="/conocimiento" className="btn btn-text btn-sm">
+              Conocimiento
+            </Link>
             <Link href="/equipo" className="btn btn-text btn-sm">
               Equipo
             </Link>
