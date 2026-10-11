@@ -34,6 +34,7 @@ async function SeguridadContent() {
         roleLabel={ctx ? ROLE_LABEL[ctx.role] : isSuper ? "Súper admin" : undefined}
         showAdmin={session.isSuperAdmin}
         showTeam={!!ctx && can(ctx.role, "team:manage")}
+        showWork={!!ctx}
       />
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu cuenta</p>

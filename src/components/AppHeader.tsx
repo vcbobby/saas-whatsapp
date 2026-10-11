@@ -13,11 +13,14 @@ export function AppHeader({
   roleLabel,
   showAdmin,
   showTeam,
+  showWork = true,
 }: {
   email: string;
   roleLabel?: string;
   showAdmin?: boolean;
   showTeam?: boolean;
+  /** Enlaces «Hoy» y «Conversaciones». Se ocultan donde no hay negocio (p. ej. administración). */
+  showWork?: boolean;
 }) {
   return (
     <header className="container-app flex min-h-20 flex-wrap items-center justify-between gap-4 py-4">
@@ -25,6 +28,16 @@ export function AppHeader({
         {brand.name}
       </Link>
       <div className="flex flex-wrap items-center gap-3">
+        {showWork && (
+          <>
+            <Link href="/hoy" className="btn btn-text btn-sm">
+              Hoy
+            </Link>
+            <Link href="/conversaciones" className="btn btn-text btn-sm">
+              Conversaciones
+            </Link>
+          </>
+        )}
         {showAdmin && (
           <Link href="/admin" className="btn btn-text btn-sm">
             Administración

@@ -24,6 +24,7 @@ export type AgentOutcome =
   | "skipped_disabled"
   | "skipped_inactive_tenant"
   | "skipped_human"
+  | "skipped_personal"
   | "skipped_superseded"
   | "skipped_no_whatsapp";
 
@@ -46,6 +47,7 @@ interface Ctx {
   msgType: string;
   body: string | null;
   convStatus: string;
+  contactLabel: string;
   waId: string;
   tenantName: string;
   tenantStatus: string;
@@ -62,7 +64,7 @@ async function loadContext(job: InboundJob): Promise<Ctx | null> {
   return withTenant(job.tenantId, async (db) => {
     const r = await db.query(
       `SELECT m.id AS message_id, m.conversation_id, c.contact_id, m.msg_type, m.body,
-              c.status AS conv_status, ct.wa_id,
+              c.status AS conv_status, ct.wa_id, ct.label AS contact_label,
               t.name AS tenant_name, t.status AS tenant_status, t.trial_ends_at,
               COALESCE(a.enabled, false) AS enabled,
               COALESCE(a.assistant_name, 'Asistente') AS assistant_name,
@@ -81,7 +83,7 @@ async function loadContext(job: InboundJob): Promise<Ctx | null> {
     if (!x) return null;
     return {
       messageId: x.message_id, conversationId: x.conversation_id, contactId: x.contact_id, msgType: x.msg_type, body: x.body,
-       convStatus: x.conv_status, waId: x.wa_id,
+       convStatus: x.conv_status, contactLabel: x.contact_label, waId: x.wa_id,
       tenantName: x.tenant_name, tenantStatus: x.tenant_status, trialEndsAt: x.trial_ends_at,
       enabled: x.enabled, assistantName: x.assistant_name, instructions: x.instructions,
       phoneId: x.phone_id, secretEnc: x.secret_enc, keyVersion: x.key_version,
@@ -137,6 +139,8 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
   const ctx = await loadContext(job);
   if (!ctx) return "skipped_not_found";
   if (IGNORED_TYPES.has(ctx.msgType)) return "skipped_ignored_type";
+  // Contactos marcados como "personal" (familia, amistades, proveedores…): el asistente nunca les responde.
+  if (ctx.contactLabel === "personal") return "skipped_personal";
   if (!ctx.enabled) return "skipped_disabled";
   if (!tenantActive(ctx)) return "skipped_inactive_tenant";
   if (!ctx.phoneId || !ctx.secretEnc || ctx.keyVersion === null) return "skipped_no_whatsapp";

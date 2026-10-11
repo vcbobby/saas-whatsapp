@@ -1,0 +1,343 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { CONTACT_LABELS, CONTACT_LABEL_TEXT, CONVERSATION_STATUS_LABEL, MEDIA_LABEL, WORK_TYPE_LABEL, type ContactLabel, type WorkType } from "@/lib/work/labels";
+import { messageTime, relativeTime } from "@/lib/work/time";
+
+type Status = "bot" | "human" | "closed";
+interface ConvRow {
+  id: string;
+  status: Status;
+  handoffReason: string | null;
+  lastMessageAt: string | null;
+  contact: { id: string; name: string; waId: string; label: ContactLabel };
+  lastPreview: string;
+  lastDirection: "in" | "out" | null;
+  needsAttention: boolean;
+}
+interface Msg {
+  id: string;
+  direction: "in" | "out";
+  type: string;
+  body: string | null;
+  sendState: string | null;
+  deliveryStatus: string | null;
+  at: string;
+}
+interface Detail {
+  conversation: { id: string; status: Status; handoffReason: string | null; assignedToMe: boolean; contact: { id: string; name: string; waId: string; label: ContactLabel } };
+  messages: Msg[];
+  work: { id: string; type: WorkType; title: string }[];
+}
+
+const FILTERS = [
+  { id: "activas", label: "Activas" },
+  { id: "persona", label: "Con una persona" },
+  { id: "asistente", label: "Con el asistente" },
+  { id: "cerradas", label: "Cerradas" },
+] as const;
+type FilterId = (typeof FILTERS)[number]["id"];
+
+const DELIVERY: Record<string, string> = { sent: "Enviado", delivered: "Entregado", read: "Leído", failed: "No se entregó" };
+const chip = { background: "var(--color-pure-white)", color: "var(--color-ink)", border: "1px solid var(--color-field-border)" } as const;
+const urgent = { background: "var(--color-signal-yellow)", color: "var(--color-ink)" } as const;
+const LIST_MS = 10_000;
+const DETAIL_MS = 5_000;
+
+export function Inbox({ initialId }: { initialId: string | null }) {
+  const uid = useId();
+  const [filter, setFilter] = useState<FilterId>("activas");
+  const [label, setLabel] = useState<ContactLabel | "">("");
+  const [first, setFirst] = useState<ConvRow[] | null>(null);
+  const [more, setMore] = useState<ConvRow[]>([]);
+  const [next, setNext] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialId);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const lastCount = useRef(0);
+
+  const qs = useCallback((before?: string) => {
+    const p = new URLSearchParams({ filter });
+    if (label) p.set("label", label);
+    if (before) p.set("before", before);
+    return p.toString();
+  }, [filter, label]);
+
+  const loadList = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/conversations?${qs()}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const d = (await res.json()) as { conversations: ConvRow[]; nextBefore: string | null };
+      setFirst(d.conversations);
+      setNext((cur) => (more.length ? cur : d.nextBefore));
+      setNow(Date.now());
+    } catch {
+      /* se reintenta */
+    }
+  }, [qs, more.length]);
+
+  useEffect(() => {
+    const t0 = setTimeout(() => void loadList(), 0);
+    const t = setInterval(() => void loadList(), LIST_MS);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(t);
+    };
+  }, [loadList]);
+
+  async function loadMore() {
+    if (!next) return;
+    const res = await fetch(`/api/conversations?${qs(next)}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const d = (await res.json()) as { conversations: ConvRow[]; nextBefore: string | null };
+    setMore((m) => [...m, ...d.conversations]);
+    setNext(d.nextBefore);
+  }
+
+  const loadDetail = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/conversations/messages?id=${id}`, { cache: "no-store" });
+      if (res.status === 404 || res.status === 400) {
+        setNotFound(true);
+        setDetail(null);
+        return;
+      }
+      if (!res.ok) return;
+      setNotFound(false);
+      setDetail((await res.json()) as Detail);
+    } catch {
+      /* se reintenta */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const t0 = setTimeout(() => void loadDetail(selected), 0);
+    const t = setInterval(() => void loadDetail(selected), DETAIL_MS);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(t);
+    };
+  }, [selected, loadDetail]);
+
+  // Al llegar mensajes nuevos, baja al final.
+  useEffect(() => {
+    const n = detail?.messages.length ?? 0;
+    if (n !== lastCount.current) {
+      lastCount.current = n;
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [detail]);
+
+  function open(id: string) {
+    setSelected(id);
+    setDetail(null);
+    setNotFound(false);
+    setConfirmClose(false);
+    setError(null);
+    lastCount.current = 0;
+    window.history.replaceState(null, "", `/conversaciones?c=${id}`);
+  }
+  function back() {
+    setSelected(null);
+    setDetail(null);
+    setNotFound(false);
+    window.history.replaceState(null, "", "/conversaciones");
+  }
+
+  async function act(body: Record<string, unknown>) {
+    if (!selected || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/conversations/update", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: selected, ...body }) });
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { message?: string };
+        setError(d.message ?? "No se pudo completar la acción.");
+      }
+      setConfirmClose(false);
+      await Promise.all([loadDetail(selected), loadList()]);
+    } catch {
+      setError("No hay conexión con el servidor. Revisa tu internet e intenta de nuevo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rows = [...(first ?? []), ...more.filter((m) => !(first ?? []).some((f) => f.id === m.id))];
+  const c = detail?.conversation;
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+      {/* ------------------------------------------------------------ lista */}
+      <section className={selected ? "hidden lg:block" : ""} aria-label="Lista de conversaciones">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar conversaciones">
+          {FILTERS.map((f) => (
+            <button key={f.id} type="button" aria-pressed={filter === f.id} className={`btn btn-sm ${filter === f.id ? "btn-primary" : "btn-ghost-dark"}`} onClick={() => { setFilter(f.id); setFirst(null); setMore([]); setNext(null); }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="field mt-4">
+          <label htmlFor={`${uid}-lab`} className="muted-dark" style={{ color: "rgba(255,255,255,0.78)" }}>Tipo de contacto</label>
+          <select id={`${uid}-lab`} className="input" value={label} onChange={(e) => { setLabel(e.target.value as ContactLabel | ""); setFirst(null); setMore([]); setNext(null); }}>
+            <option value="">Todos</option>
+            {CONTACT_LABELS.map((l) => (
+              <option key={l} value={l}>{CONTACT_LABEL_TEXT[l].replace(" (el asistente no responde)", "")}</option>
+            ))}
+          </select>
+        </div>
+
+        {first === null ? (
+          <p className="muted-dark mt-6" role="status">Cargando…</p>
+        ) : rows.length === 0 ? (
+          <div className="card-light mt-6" style={{ padding: 24 }}>
+            <p className="muted">No hay conversaciones con este filtro.</p>
+          </div>
+        ) : (
+          <ul className="mt-6 flex flex-col gap-3">
+            {rows.map((r) => (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  onClick={() => open(r.id)}
+                  aria-current={selected === r.id ? "true" : undefined}
+                  className="card-light w-full text-left"
+                  style={{ padding: 16, borderRadius: 20, border: selected === r.id ? "2px solid var(--color-ink)" : "2px solid transparent", cursor: "pointer" }}
+                >
+                  <span className="flex items-baseline justify-between gap-3">
+                    <strong className="truncate text-[16px]">{r.contact.name}</strong>
+                    <span className="muted shrink-0 text-[13px]">{relativeTime(r.lastMessageAt, now)}</span>
+                  </span>
+                  <span className="muted mt-1 block truncate text-[14px]">
+                    {r.lastDirection === "out" ? "Asistente: " : ""}
+                    {r.lastPreview || "Sin mensajes"}
+                  </span>
+                  <span className="mt-2 flex flex-wrap gap-2">
+                    {r.needsAttention && <span className="badge" style={urgent}>Necesita atención</span>}
+                    {r.status !== "bot" && <span className="badge" style={chip}>{CONVERSATION_STATUS_LABEL[r.status]}</span>}
+                    {r.contact.label !== "sin_clasificar" && <span className="badge" style={chip}>{CONTACT_LABEL_TEXT[r.contact.label].replace(" (el asistente no responde)", "")}</span>}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {next && (
+          <button type="button" className="btn btn-sm btn-ghost-dark mt-4 w-full" onClick={() => void loadMore()}>
+            Ver más antiguas
+          </button>
+        )}
+      </section>
+
+      {/* ---------------------------------------------------------- detalle */}
+      <section className={selected ? "" : "hidden lg:block"} aria-label="Conversación">
+        {!selected ? (
+          <div className="card-light" style={{ padding: 32 }}>
+            <p className="eyebrow">Conversaciones</p>
+            <h2 className="mt-3 text-[24px]">Elige una conversación</h2>
+            <p className="muted mt-3">Aquí verás todo lo que se habló, podrás tomarla para que el asistente deje de responder y clasificar a la persona.</p>
+          </div>
+        ) : notFound ? (
+          <div className="card-light" style={{ padding: 32 }}>
+            <h2 className="text-[24px]">No encontramos esa conversación</h2>
+            <button type="button" className="btn btn-sm btn-ghost-light mt-4" onClick={back}>Volver a la lista</button>
+          </div>
+        ) : !c ? (
+          <p className="muted-dark" role="status">Cargando…</p>
+        ) : (
+          <div className="card-light" style={{ padding: 24 }}>
+            <div className="lg:hidden">
+              <button type="button" className="btn btn-text btn-sm" style={{ color: "var(--color-ink)", textDecoration: "underline" }} onClick={back}>← Volver a la lista</button>
+            </div>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-[24px]">{c.contact.name}</h2>
+                <p className="muted mt-1 text-[14px]">+{c.contact.waId} · {CONVERSATION_STATUS_LABEL[c.status]}{c.status === "human" && c.assignedToMe ? " · la tienes tú" : ""}</p>
+              </div>
+              <div className="field" style={{ minWidth: 220 }}>
+                <label htmlFor={`${uid}-tipo`}>Tipo de contacto</label>
+                <select id={`${uid}-tipo`} className="input" value={c.contact.label} disabled={busy} onChange={(e) => void act({ action: "label", label: e.target.value })}>
+                  {CONTACT_LABELS.map((l) => (
+                    <option key={l} value={l}>{CONTACT_LABEL_TEXT[l]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {c.contact.label === "personal" && (
+              <p className="alert-warn mt-4" role="note">Este contacto está marcado como personal: el asistente no le responde.</p>
+            )}
+            {detail!.work.length > 0 && (
+              <p className="alert-warn mt-4" role="note">
+                Pendiente: <strong>{detail!.work[0]!.title}</strong> ({WORK_TYPE_LABEL[detail!.work[0]!.type]}).{" "}
+                <Link href="/hoy" className="link">Ver en Hoy</Link>
+              </p>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              {c.status !== "closed" && !(c.status === "human" && c.assignedToMe) && (
+                <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void act({ action: "take" })}>
+                  Tomar la conversación
+                </button>
+              )}
+              {c.status === "human" && (
+                <button type="button" className="btn btn-sm btn-ghost-light" disabled={busy} onClick={() => void act({ action: "release" })}>
+                  Devolver al asistente
+                </button>
+              )}
+              {c.status !== "closed" &&
+                (confirmClose ? (
+                  <>
+                    <span className="text-[14px]">¿Cerrar la conversación?</span>
+                    <button type="button" className="btn btn-sm btn-ghost-light" disabled={busy} onClick={() => void act({ action: "close" })}>Sí, cerrar</button>
+                    <button type="button" className="btn btn-sm btn-text" style={{ color: "var(--color-ink)", textDecoration: "underline" }} onClick={() => setConfirmClose(false)}>Cancelar</button>
+                  </>
+                ) : (
+                  <button type="button" className="btn btn-sm btn-text" style={{ color: "var(--color-ink)", textDecoration: "underline" }} disabled={busy} onClick={() => setConfirmClose(true)}>Cerrar</button>
+                ))}
+            </div>
+            <div role="alert" aria-live="assertive">{error && <p className="alert-error mt-4">{error}</p>}</div>
+
+            <div className="mt-6 flex max-h-[60vh] flex-col gap-3 overflow-y-auto rounded-[20px] p-4" style={{ background: "var(--color-pure-white)", border: "1px solid var(--color-fog-border)" }} role="log" aria-label="Mensajes" tabIndex={0}>
+              {detail!.messages.length === 0 && <p className="muted text-[14px]">Todavía no hay mensajes.</p>}
+              {detail!.messages.map((m) => {
+                const out = m.direction === "out";
+                const media = m.type !== "text" ? `[${MEDIA_LABEL[m.type] ?? m.type}]` : "";
+                const status = out ? (m.sendState === "failed" ? "No se pudo enviar" : m.sendState === "unknown" ? "Envío incierto" : m.deliveryStatus ? DELIVERY[m.deliveryStatus] : "") : "";
+                return (
+                  <div key={m.id} className={`flex ${out ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className="max-w-[85%] rounded-[18px] px-4 py-3"
+                      style={{ background: out ? "var(--color-mint-whisper)" : "var(--color-mint-frost)", color: "var(--color-ink)", border: "1px solid var(--color-fog-border)" }}
+                    >
+                      {out && <p className="text-[12px] font-medium" style={{ color: "var(--color-ink-muted)" }}>Asistente</p>}
+                      {media && <p className="text-[14px] font-medium">{media}</p>}
+                      {m.body && <p className="text-[15px]" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.body}</p>}
+                      <p className="mt-1 text-[12px]" style={{ color: "var(--color-ink-muted)" }}>
+                        {messageTime(m.at, now)}
+                        {status && ` · ${status}`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={bottomRef} />
+            </div>
+            {c.status !== "closed" && (
+              <p className="muted mt-4 text-[14px]">
+                Responder desde aquí llega en el próximo paso. Mientras tanto, «Tomar la conversación» hace que el asistente deje de responder.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

@@ -36,7 +36,7 @@ async function AdminContent() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <AppHeader email={auth.session.email} roleLabel="Súper admin" />
+      <AppHeader email={auth.session.email} roleLabel="Súper admin" showWork={false} />
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Administración</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Negocios</h1>
