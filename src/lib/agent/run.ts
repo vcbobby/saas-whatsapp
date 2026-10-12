@@ -6,7 +6,8 @@ import { getLlmEnv } from "@/lib/env";
 import { withLock } from "@/lib/queue/lock";
 import type { InboundJob } from "@/lib/queue/producer";
 import { sendText } from "@/lib/whatsapp/graph";
-import { FIXED, RULES_LINES, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply, type HistoryRow } from "./prompt";
+import { fixedTexts, styleFromRow, type AgentStyle } from "./style";
+import { RULES_LINES, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply, type HistoryRow } from "./prompt";
 import { getEmbedder, type Embedder } from "@/lib/kb/embeddings";
 import { searchKnowledge, type Snippet } from "@/lib/kb/search";
 import { allowedContacts, checkOutput, looksLikeInjection, newCanary } from "./safety";
@@ -55,6 +56,7 @@ interface Ctx {
   enabled: boolean;
   assistantName: string;
   instructions: string;
+  style: AgentStyle;
   phoneId: string | null;
   secretEnc: string | null;
   keyVersion: number | null;
@@ -69,6 +71,7 @@ async function loadContext(job: InboundJob): Promise<Ctx | null> {
               COALESCE(a.enabled, false) AS enabled,
               COALESCE(a.assistant_name, 'Asistente') AS assistant_name,
               COALESCE(a.instructions, '') AS instructions,
+              a.business_type, a.country, a.tone, a.emoji_level, a.reply_length,
               i.external_id AS phone_id, i.secret_enc, i.key_version
          FROM messages m
          JOIN conversations c ON c.tenant_id = m.tenant_id AND c.id = m.conversation_id
@@ -85,7 +88,7 @@ async function loadContext(job: InboundJob): Promise<Ctx | null> {
       messageId: x.message_id, conversationId: x.conversation_id, contactId: x.contact_id, msgType: x.msg_type, body: x.body,
        convStatus: x.conv_status, contactLabel: x.contact_label, waId: x.wa_id,
       tenantName: x.tenant_name, tenantStatus: x.tenant_status, trialEndsAt: x.trial_ends_at,
-      enabled: x.enabled, assistantName: x.assistant_name, instructions: x.instructions,
+      enabled: x.enabled, assistantName: x.assistant_name, instructions: x.instructions, style: styleFromRow(x),
       phoneId: x.phone_id, secretEnc: x.secret_enc, keyVersion: x.key_version,
     } satisfies Ctx;
   });
@@ -215,23 +218,24 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
   const contactLimited = perContact.hora >= env.AGENT_CONTACT_HOURLY_LIMIT || perContact.dia >= env.AGENT_CONTACT_DAILY_LIMIT;
 
   // Qué responder.
+  const fixed = fixedTexts(ctx.style);
   let text: string;
   let wantsHandoff = false;
   let handoffReason = "pedido_de_persona";
   let usage = { input: 0, output: 0 };
   if (!(TEXT_TYPES.has(ctx.msgType) && ctx.body)) {
-    text = FIXED.nonText;
+    text = fixed.nonText;
   } else if (contactLimited) {
     await recordEvent(tenantId, ctx.conversationId, ctx.messageId, "limite_contacto");
-    text = FIXED.rateLimited;
+    text = fixed.rateLimited;
     wantsHandoff = true;
     handoffReason = "limite_contacto";
   } else if (strikes >= INJECTION_STRIKES) {
-    text = FIXED.handoff;
+    text = fixed.handoff;
     wantsHandoff = true;
     handoffReason = "intentos_de_manipulacion";
   } else if (customerWantsHuman(ctx.body)) {
-    text = FIXED.handoff;
+    text = fixed.handoff;
     wantsHandoff = true;
   } else {
     const history = await withTenant(tenantId, async (db) => {
@@ -255,21 +259,21 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
     }
     const canary = newCanary();
     const out = await llm.generate({
-      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, canary, knowledge }),
+      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge }),
       messages: buildTurns(history),
       maxTokens: LLM_MAX_TOKENS,
     });
     usage = { input: out.inputTokens, output: out.outputTokens };
-    const parsed = parseReply(out.text);
+    const parsed = parseReply(out.text, fixed.handoff);
     // Revisión de salida: si el modelo filtró sus reglas o inventó enlaces/correos, NO se envía; pasa a una persona.
     const verdict = checkOutput(parsed.text, { canary, rulesLines: RULES_LINES, allowed: allowedContacts([ctx.instructions, ...knowledge.map((k) => k.content)].join("\n")) });
     if (!verdict.ok) {
       await recordEvent(tenantId, ctx.conversationId, ctx.messageId, verdict.kind);
-      text = FIXED.fallback;
+      text = fixed.fallback;
       wantsHandoff = true;
       handoffReason = verdict.kind === "fuga_prompt" ? "fuga_de_instrucciones" : "salida_bloqueada";
     } else if (!parsed.text) {
-      text = FIXED.fallback;
+      text = fixed.fallback;
       wantsHandoff = true;
       handoffReason = "respuesta_vacia";
     } else {
