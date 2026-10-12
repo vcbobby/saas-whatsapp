@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireTenant } from "@/lib/auth/guard";
 import { errorResponse, jsonResponse, route } from "@/lib/auth/http";
+import { windowEnd } from "@/lib/conversations/reply";
 import { withTenant } from "@/lib/db";
 
 const MAX_MESSAGES = 100;
@@ -23,10 +24,16 @@ export const GET = route(async (req) => {
     );
     if (c.rowCount !== 1) return null;
     const msgs = await db.query(
-      `SELECT id, direction, msg_type, body, send_state, delivery_status, received_at FROM (
+      `SELECT id, direction, msg_type, body, delivery_status, received_at, sent_by,
+              CASE WHEN send_state = 'sending' AND received_at < now() - interval '2 minutes' THEN 'unknown' ELSE send_state END AS send_state
+         FROM (
          SELECT * FROM messages WHERE tenant_id = $1 AND conversation_id = $2
           ORDER BY received_at DESC, id DESC LIMIT ${MAX_MESSAGES}
        ) t ORDER BY received_at, id`,
+      [tenantId, id.data],
+    );
+    const inbound = await db.query<{ at: Date | null }>(
+      "SELECT max(created_at) AS at FROM messages WHERE tenant_id = $1 AND conversation_id = $2 AND direction = 'in'",
       [tenantId, id.data],
     );
     const work = await db.query(
@@ -35,7 +42,7 @@ export const GET = route(async (req) => {
         ORDER BY priority, created_at`,
       [tenantId, id.data],
     );
-    return { c: c.rows[0], msgs: msgs.rows, work: work.rows };
+    return { c: c.rows[0], msgs: msgs.rows, work: work.rows, lastInbound: inbound.rows[0]?.at ?? null };
   });
   if (!data) return errorResponse(404, "no_encontrado", "No encontrado.");
 
@@ -46,11 +53,13 @@ export const GET = route(async (req) => {
       status: c.status,
       handoffReason: c.handoff_reason,
       assignedToMe: c.assigned_to === auth.session.userId,
+      replyUntil: windowEnd(data.lastInbound)?.toISOString() ?? null,
       contact: { id: c.contact_id, name: c.contact_name, waId: c.wa_id, label: c.label },
     },
     messages: data.msgs.map((m) => ({
       id: m.id,
       direction: m.direction,
+      sender: m.direction === "in" ? "customer" : m.sent_by === null ? "assistant" : m.sent_by === auth.session.userId ? "me" : "team",
       type: m.msg_type,
       body: m.body,
       sendState: m.send_state,
