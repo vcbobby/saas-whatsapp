@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BUSINESS_TYPES, COUNTRY_CODES, EMOJI_LEVELS, REPLY_LENGTHS, TONES } from "@/lib/agent/style";
 
 export const emailSchema = z
   .string()
@@ -106,4 +107,10 @@ export const agentSettingsSchema = z.object({
   enabled: z.boolean(),
   assistantName: z.string().trim().min(1, "Ponle un nombre al asistente").max(60, "Máximo 60 caracteres"),
   instructions: z.string().max(4000, "Máximo 4000 caracteres"),
+  // Estilo (opcional: si no viene, se conserva el que ya tiene el negocio).
+  businessType: z.enum(BUSINESS_TYPES).optional(),
+  country: z.enum(COUNTRY_CODES).optional(),
+  tone: z.enum(TONES).optional(),
+  emojiLevel: z.enum(EMOJI_LEVELS).optional(),
+  replyLength: z.enum(REPLY_LENGTHS).optional(),
 });

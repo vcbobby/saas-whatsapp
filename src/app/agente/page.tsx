@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AgentSettings } from "@/components/AgentSettings";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { styleFromRow } from "@/lib/agent/style";
 import { withTenant } from "@/lib/db";
 import { devToolsEnabled, getLlmEnv, getSendMode } from "@/lib/env";
 import { can } from "@/lib/auth/permissions";
@@ -29,8 +30,8 @@ async function AgentContent() {
 
   const llm = getLlmEnv();
   const data = await withTenant(ctx.tenantId, async (db) => {
-    const a = await db.query<{ enabled: boolean; assistant_name: string; instructions: string }>(
-      "SELECT enabled, assistant_name, instructions FROM tenant_agents WHERE tenant_id = $1",
+    const a = await db.query<{ enabled: boolean; assistant_name: string; instructions: string; business_type: string; country: string; tone: string; emoji_level: string; reply_length: string }>(
+      "SELECT enabled, assistant_name, instructions, business_type, country, tone, emoji_level, reply_length FROM tenant_agents WHERE tenant_id = $1",
       [ctx.tenantId],
     );
     const wa = await db.query("SELECT 1 FROM tenant_integrations WHERE provider = 'whatsapp'");
@@ -59,6 +60,7 @@ async function AgentContent() {
             enabled={data.agent?.enabled ?? false}
             assistantName={data.agent?.assistant_name ?? "Asistente"}
             instructions={data.agent?.instructions ?? ""}
+            style={styleFromRow(data.agent)}
             canManage={can(ctx.role, "agent:manage")}
             whatsappConnected={data.whatsapp}
             mockMode={llm.LLM_PROVIDER === "mock"}
