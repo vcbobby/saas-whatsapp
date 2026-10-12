@@ -12,6 +12,7 @@ const MATRIX = {
   "agent:manage": ["owner", "admin"],
   "agenda:read": ["owner", "admin", "agent"],
   "agenda:manage": ["owner", "admin"],
+  "agenda:book": ["owner", "admin", "agent"],
   "billing:manage": ["owner"],
   "tenant:delete": ["owner"],
 } as const satisfies Record<string, readonly Role[]>;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
-import { AgendaConfig } from "@/components/AgendaConfig";
+import { AgendaDay } from "@/components/AgendaDay";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
 import { can } from "@/lib/auth/permissions";
 import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
@@ -36,9 +36,8 @@ async function AgendaContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Agenda</h1>
-        <p className="muted-dark mt-3 max-w-[640px]">Define tus servicios y horarios. Las citas se agendarán solo en los huecos libres.</p>
-        <div className="mt-10">
-          <AgendaConfig />
+        <div className="mt-8">
+          <AgendaDay />
         </div>
       </main>
     </div>
