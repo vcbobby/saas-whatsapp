@@ -36,6 +36,9 @@ export function AppHeader({
             <Link href="/conversaciones" className="btn btn-text btn-sm">
               Conversaciones
             </Link>
+            <Link href="/agenda" className="btn btn-text btn-sm">
+              Agenda
+            </Link>
           </>
         )}
         {showAdmin && (
