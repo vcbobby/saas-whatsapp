@@ -10,6 +10,7 @@ import { fixedTexts, styleFromRow, type AgentStyle } from "./style";
 import { RULES_LINES, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply, type HistoryRow } from "./prompt";
 import { getEmbedder, type Embedder } from "@/lib/kb/embeddings";
 import { searchKnowledge, type Snippet } from "@/lib/kb/search";
+import { AGENDA_RULES_LINES, bookingTexts, buildMenu, createAgentAppointment, parseBookingRequest, stripBookingMarkers, whenLabel, type AgendaMenu } from "./booking";
 import { allowedContacts, checkOutput, looksLikeInjection, newCanary } from "./safety";
 
 export type AgentOutcome =
@@ -49,6 +50,7 @@ interface Ctx {
   body: string | null;
   convStatus: string;
   contactLabel: string;
+  contactName: string | null;
   waId: string;
   tenantName: string;
   tenantStatus: string;
@@ -66,7 +68,7 @@ async function loadContext(job: InboundJob): Promise<Ctx | null> {
   return withTenant(job.tenantId, async (db) => {
     const r = await db.query(
       `SELECT m.id AS message_id, m.conversation_id, c.contact_id, m.msg_type, m.body,
-              c.status AS conv_status, ct.wa_id, ct.label AS contact_label,
+              c.status AS conv_status, ct.wa_id, ct.label AS contact_label, ct.display_name AS contact_name,
               t.name AS tenant_name, t.status AS tenant_status, t.trial_ends_at,
               COALESCE(a.enabled, false) AS enabled,
               COALESCE(a.assistant_name, 'Asistente') AS assistant_name,
@@ -86,7 +88,7 @@ async function loadContext(job: InboundJob): Promise<Ctx | null> {
     if (!x) return null;
     return {
       messageId: x.message_id, conversationId: x.conversation_id, contactId: x.contact_id, msgType: x.msg_type, body: x.body,
-       convStatus: x.conv_status, contactLabel: x.contact_label, waId: x.wa_id,
+       convStatus: x.conv_status, contactLabel: x.contact_label, contactName: x.contact_name, waId: x.wa_id,
       tenantName: x.tenant_name, tenantStatus: x.tenant_status, trialEndsAt: x.trial_ends_at,
       enabled: x.enabled, assistantName: x.assistant_name, instructions: x.instructions, style: styleFromRow(x),
       phoneId: x.phone_id, secretEnc: x.secret_enc, keyVersion: x.key_version,
@@ -257,21 +259,48 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
     } catch (err) {
       console.error("[agente] base de conocimiento no disponible:", err instanceof Error ? err.message : err);
     }
+    // Agenda: si el negocio tiene servicios, el asistente recibe un menú cerrado de servicios y horarios libres.
+    let menu: AgendaMenu | null = null;
+    try {
+      menu = await withTenant(tenantId, (db) => buildMenu(db, tenantId, ctx.contactId));
+    } catch (err) {
+      console.error("[agente] agenda no disponible:", err instanceof Error ? err.message : err);
+    }
     const canary = newCanary();
     const out = await llm.generate({
-      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge }),
+      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text }),
       messages: buildTurns(history),
       maxTokens: LLM_MAX_TOKENS,
     });
     usage = { input: out.inputTokens, output: out.outputTokens };
-    const parsed = parseReply(out.text, fixed.handoff);
+    const request = menu ? parseBookingRequest(out.text) : null;
+    const parsed = parseReply(stripBookingMarkers(out.text), fixed.handoff);
     // Revisión de salida: si el modelo filtró sus reglas o inventó enlaces/correos, NO se envía; pasa a una persona.
-    const verdict = checkOutput(parsed.text, { canary, rulesLines: RULES_LINES, allowed: allowedContacts([ctx.instructions, ...knowledge.map((k) => k.content)].join("\n")) });
+    const verdict = checkOutput(parsed.text, { canary, rulesLines: [...RULES_LINES, ...AGENDA_RULES_LINES], allowed: allowedContacts([ctx.instructions, ...knowledge.map((k) => k.content)].join("\n")) });
     if (!verdict.ok) {
       await recordEvent(tenantId, ctx.conversationId, ctx.messageId, verdict.kind);
       text = fixed.fallback;
       wantsHandoff = true;
       handoffReason = verdict.kind === "fuga_prompt" ? "fuga_de_instrucciones" : "salida_bloqueada";
+    } else if (request && menu && !parsed.handoff) {
+      // Pedido de cita: el servidor valida códigos, horario y límites; el mensaje al cliente lo escribe el servidor.
+      const bt = bookingTexts(ctx.style);
+      const m = menu;
+      const res = await withTenant(tenantId, (db) =>
+        createAgentAppointment(db, { tenantId, contactId: ctx.contactId, conversationId: ctx.conversationId, messageId: ctx.messageId, waId: ctx.waId, contactName: ctx.contactName, menu: m, req: request }),
+      );
+      if (res.kind === "ok") text = bt.requested(res.name, res.serviceName, whenLabel(res.startsAt, m.timezone));
+      else if (res.kind === "ocupado") text = bt.slotTaken;
+      else if (res.kind === "limite") {
+        text = bt.limit;
+        wantsHandoff = true;
+        handoffReason = "citas_limite";
+      } else {
+        // Códigos que no están en el menú de este turno: no se crea nada y pasa a una persona.
+        text = fixed.fallback;
+        wantsHandoff = true;
+        handoffReason = "cita_invalida";
+      }
     } else if (!parsed.text) {
       text = fixed.fallback;
       wantsHandoff = true;
