@@ -30,16 +30,22 @@ export const POST = route(async (req) => {
     if (cur.rowCount !== 1) return "no_existe";
     const a = cur.rows[0]!;
     const active = a.status === "pendiente" || a.status === "confirmada";
+    await db.query("SELECT set_config('app.actor', $1, true)", [auth.session.userId]);
     const set = (status: string) => db.query("UPDATE appointments SET status = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2", [tenantId, d.id, status]);
+    // La tarea «Confirmar cita» que creó el asistente se cierra sola cuando la persona decide.
+    const closeTask = (status: "resuelto" | "descartado") =>
+      db.query("UPDATE work_items SET status = $3, resolved_at = now(), resolved_by = $4 WHERE tenant_id = $1 AND dedupe_key = $2 AND status IN ('abierto', 'en_proceso')", [tenantId, `cita:${d.id}`, status, auth.session.userId]);
     try {
       switch (d.action) {
         case "confirm":
           if (a.status !== "pendiente") return "estado";
           await set("confirmada");
+          await closeTask("resuelto");
           return "ok";
         case "cancel":
           if (!active) return "estado";
           await set("cancelada");
+          await closeTask("descartado");
           return "ok";
         case "complete":
         case "no_show":
