@@ -42,6 +42,9 @@ export function AppHeader({
             <Link href="/catalogo" className="btn btn-text btn-sm">
               Catálogo
             </Link>
+            <Link href="/pedidos" className="btn btn-text btn-sm">
+              Pedidos
+            </Link>
           </>
         )}
         {showAdmin && (
