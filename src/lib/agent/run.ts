@@ -8,9 +8,11 @@ import type { InboundJob } from "@/lib/queue/producer";
 import { sendText } from "@/lib/whatsapp/graph";
 import { fixedTexts, styleFromRow, type AgentStyle } from "./style";
 import { RULES_LINES, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply, type HistoryRow } from "./prompt";
+import { formatMoney } from "@/lib/catalog/money";
 import { getEmbedder, type Embedder } from "@/lib/kb/embeddings";
 import { searchKnowledge, type Snippet } from "@/lib/kb/search";
 import { AGENDA_RULES_LINES, bookingTexts, buildMenu, createAgentAppointment, parseBookingRequest, stripBookingMarkers, whenLabel, type AgendaMenu } from "./booking";
+import { ORDER_RULES_LINES, buildCatalogMenu, createAgentOrder, orderTexts, parseOrderRequest, stripOrderMarkers, type CatalogMenu } from "./ordering";
 import { allowedContacts, checkOutput, looksLikeInjection, newCanary } from "./safety";
 
 export type AgentOutcome =
@@ -266,22 +268,53 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
     } catch (err) {
       console.error("[agente] agenda no disponible:", err instanceof Error ? err.message : err);
     }
+    // Catálogo: si el negocio tiene productos activos, el asistente recibe una lista cerrada con precios y disponibilidad.
+    let catalog: CatalogMenu | null = null;
+    try {
+      const hints = history.filter((h) => h.direction === "in" && h.msg_type === "text" && h.body).slice(-3).map((h) => h.body as string);
+      catalog = await withTenant(tenantId, (db) => buildCatalogMenu(db, tenantId, ctx.contactId, hints));
+    } catch (err) {
+      console.error("[agente] catálogo no disponible:", err instanceof Error ? err.message : err);
+    }
     const canary = newCanary();
     const out = await llm.generate({
-      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text }),
+      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text, catalog: catalog?.text }),
       messages: buildTurns(history),
       maxTokens: LLM_MAX_TOKENS,
     });
     usage = { input: out.inputTokens, output: out.outputTokens };
     const request = menu ? parseBookingRequest(out.text) : null;
-    const parsed = parseReply(stripBookingMarkers(out.text), fixed.handoff);
+    const orderReq = catalog ? parseOrderRequest(out.text) : null;
+    const parsed = parseReply(stripOrderMarkers(stripBookingMarkers(out.text)), fixed.handoff);
     // Revisión de salida: si el modelo filtró sus reglas o inventó enlaces/correos, NO se envía; pasa a una persona.
-    const verdict = checkOutput(parsed.text, { canary, rulesLines: [...RULES_LINES, ...AGENDA_RULES_LINES], allowed: allowedContacts([ctx.instructions, ...knowledge.map((k) => k.content)].join("\n")) });
+    const verdict = checkOutput(parsed.text, { canary, rulesLines: [...RULES_LINES, ...AGENDA_RULES_LINES, ...ORDER_RULES_LINES], allowed: allowedContacts([ctx.instructions, ...knowledge.map((k) => k.content)].join("\n")) });
     if (!verdict.ok) {
       await recordEvent(tenantId, ctx.conversationId, ctx.messageId, verdict.kind);
       text = fixed.fallback;
       wantsHandoff = true;
       handoffReason = verdict.kind === "fuga_prompt" ? "fuga_de_instrucciones" : "salida_bloqueada";
+    } else if (request && orderReq && !parsed.handoff) {
+      // Una cita y un pedido en el mismo mensaje: no se adivina qué quiso el cliente.
+      text = fixed.fallback;
+      wantsHandoff = true;
+      handoffReason = "solicitud_mixta";
+    } else if (orderReq && catalog && !parsed.handoff) {
+      const ot = orderTexts(ctx.style);
+      const c = catalog;
+      const res = await withTenant(tenantId, (db) =>
+        createAgentOrder(db, { tenantId, contactId: ctx.contactId, conversationId: ctx.conversationId, messageId: ctx.messageId, waId: ctx.waId, contactName: ctx.contactName, menu: c, req: orderReq }),
+      );
+      if (res.kind === "ok") text = ot.requested(res.name, res.number, res.lines, formatMoney(res.totalMinor, res.currency));
+      else if (res.kind === "sin_stock") text = ot.unavailable(res.names);
+      else if (res.kind === "limite") {
+        text = ot.limit;
+        wantsHandoff = true;
+        handoffReason = "pedidos_limite";
+      } else {
+        text = fixed.fallback;
+        wantsHandoff = true;
+        handoffReason = "pedido_invalido";
+      }
     } else if (request && menu && !parsed.handoff) {
       // Pedido de cita: el servidor valida códigos, horario y límites; el mensaje al cliente lo escribe el servidor.
       const bt = bookingTexts(ctx.style);
