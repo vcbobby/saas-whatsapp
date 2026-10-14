@@ -55,6 +55,9 @@ export function AppHeader({
         {showTeam && (
           // Quien puede gestionar el equipo (dueño y administrador) también gestiona el asistente.
           <>
+            <Link href="/copiloto" className="btn btn-text btn-sm">
+              Copiloto
+            </Link>
             <Link href="/agente" className="btn btn-text btn-sm">
               Asistente
             </Link>

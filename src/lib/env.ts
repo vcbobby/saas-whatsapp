@@ -67,6 +67,8 @@ const llmSchema = z
     // Tope de respuestas del asistente a UN mismo cliente (contacto): evita que una persona gaste tu IA.
     AGENT_CONTACT_HOURLY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(20),
     AGENT_CONTACT_DAILY_LIMIT: z.coerce.number().int().min(1).max(100_000).default(60),
+    // Preguntas al copiloto del dueño por negocio y día (UTC). Acota el gasto de IA de esta función.
+    COPILOT_DAILY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(40),
     AGENT_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(40).default(12),
     APP_ENV: z.enum(["local", "test", "staging", "production"]),
   })
