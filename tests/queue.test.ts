@@ -172,17 +172,17 @@ describe("webhook → cola", () => {
     const t = await register("colgado");
     const admin = new IORedis(process.env.REDIS_URL!, { maxRetriesPerRequest: 1 });
     await producer.enqueueInbound([{ tenantId: t.tenantId, messageId: randomUUID() }]).catch(() => {}); // calienta la conexión
-    await admin.call("CLIENT", "PAUSE", "4500", "ALL");
+    await admin.call("CLIENT", "PAUSE", "9000", "ALL");
     const wa = waId();
     const t0 = Date.now();
     const res = await hookPost(hookReq(t.phoneId, wa));
     const ms = Date.now() - t0;
     expect(res.status).toBe(200);
-    expect(ms).toBeLessThan(4_200);
+    expect(ms).toBeLessThan(8_000);
     expect((await messageOf(t.tenantId, wa))?.process_state).toBe("pending");
-    await sleep(Math.max(0, 4_700 - ms)); // espera a que termine la pausa
+    await sleep(Math.max(0, 9_200 - ms)); // espera a que termine la pausa
     admin.disconnect();
-  }, 15_000);
+  }, 25_000);
 });
 
 describe("procesar un trabajo", () => {

@@ -36,7 +36,7 @@ export interface MenuSlot { code: string; serviceCode: string; startsAt: string 
 export interface AgendaMenu { timezone: string; services: MenuService[]; slots: MenuSlot[]; text: string }
 
 /** Texto escrito por el negocio que va al prompt: sin saltos de línea ni marcas que se confundan con las nuestras. */
-function cleanLabel(s: string, max: number): string {
+export function cleanLabel(s: string, max: number): string {
   return normalizeUntrusted(s).replace(/\[\[|\]\]|[<>\r\n]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
