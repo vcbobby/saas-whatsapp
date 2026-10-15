@@ -8,6 +8,7 @@ import { processInbound } from "@/lib/queue/process";
 import { sweepPending } from "@/lib/queue/sweeper";
 import { createInboundHandler, onJobFailed } from "./handler";
 import { indexPending } from "./kb";
+import { deliverDue } from "@/lib/webhooks/deliver";
 
 const handler = createInboundHandler();
 
@@ -59,6 +60,26 @@ async function indexKb() {
 }
 const kbTimer = setInterval(() => void indexKb(), KB_EVERY_MS);
 
+// Avisos (webhooks) a otros sistemas: la cola vive en Postgres; se revisa cada pocos segundos.
+const WEBHOOK_EVERY_MS = 3_000;
+let delivering = false;
+async function deliverWebhooks() {
+  if (delivering || closing) return;
+  delivering = true;
+  try {
+    // Mientras haya entregas vencidas se sigue sin esperar al siguiente turno (hasta un tope por vuelta).
+    for (let i = 0; i < 10 && !closing; i++) {
+      const c = await deliverDue(5);
+      if (c.delivered + c.retry + c.failed + c.skipped === 0) break;
+    }
+  } catch (err) {
+    console.error("[worker] avisos (webhooks) falló:", err instanceof Error ? err.message : err);
+  } finally {
+    delivering = false;
+  }
+}
+const webhookTimer = setInterval(() => void deliverWebhooks(), WEBHOOK_EVERY_MS);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
@@ -66,6 +87,7 @@ async function shutdown(signal: string) {
   console.log(`[worker] ${signal}: cerrando con calma…`);
   clearInterval(timer);
   clearInterval(kbTimer);
+  clearInterval(webhookTimer);
   try {
     await worker.close();
     await closeProducer();
