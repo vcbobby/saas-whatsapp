@@ -2,13 +2,13 @@ import { z } from "zod";
 import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
-import { MAX_RULES, ruleFields, statusOk } from "@/lib/automations/rules";
+import { MAX_RULES, actionError, ruleFields, statusOk } from "@/lib/automations/rules";
 
 export const createSchema = z.object(ruleFields);
 
 export const ruleRow = (r: Record<string, unknown>) => ({
   id: r.id, name: r.name, triggerEvent: r.trigger_event, onlyStatus: r.only_status, taskTitle: r.task_title,
-  taskPriority: r.task_priority, taskDueMinutes: r.task_due_minutes, active: r.active, runCount: r.run_count, lastRunAt: r.last_run_at,
+  actionType: r.action_type, messageTemplate: r.message_template, taskPriority: r.task_priority, taskDueMinutes: r.task_due_minutes, active: r.active, runCount: r.run_count, lastRunAt: r.last_run_at,
 });
 
 /** Reglas del negocio. */
@@ -17,7 +17,16 @@ export const GET = route(async (req) => {
   if (!auth.ok) return auth.response;
   const rows = await withTenant(auth.ctx.tenantId, async (db) =>
     (await db.query("SELECT * FROM automation_rules WHERE tenant_id = $1 ORDER BY created_at, id", [auth.ctx.tenantId])).rows);
-  return jsonResponse({ max: MAX_RULES, rules: rows.map(ruleRow) });
+  const notes = await withTenant(auth.ctx.tenantId, async (db) =>
+    (await db.query(
+      `SELECT n.id, n.rule_id, n.customer_name, n.body, n.status, n.reason, n.attempts, n.created_at, r.name AS rule_name
+         FROM customer_notifications n LEFT JOIN automation_rules r ON r.tenant_id = n.tenant_id AND r.id = n.rule_id
+        WHERE n.tenant_id = $1 ORDER BY n.created_at DESC, n.id LIMIT 30`, [auth.ctx.tenantId])).rows);
+  return jsonResponse({
+    max: MAX_RULES,
+    rules: rows.map(ruleRow),
+    notifications: notes.map((n) => ({ id: n.id, ruleName: n.rule_name, customerName: n.customer_name, body: n.body, status: n.status, reason: n.reason, attempts: n.attempts, createdAt: n.created_at })),
+  });
 });
 
 export const POST = route(async (req) => {
@@ -30,12 +39,14 @@ export const POST = route(async (req) => {
   const d = body.data;
   const status = d.onlyStatus || null;
   if (!statusOk(d.triggerEvent, status)) return errorResponse(422, "estado_no_valido", "Ese estado no corresponde al aviso elegido.", { fields: ["onlyStatus"] });
+  const aerr = actionError(d);
+  if (aerr) return errorResponse(422, "accion_no_valida", aerr, { fields: ["messageTemplate"] });
   const { tenantId } = auth.ctx;
   try {
     const id = await withTenant(tenantId, async (db) => {
       const r = await db.query(
-        "INSERT INTO automation_rules (tenant_id, name, trigger_event, only_status, task_title, task_priority, task_due_minutes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
-        [tenantId, d.name, d.triggerEvent, status, d.taskTitle, d.taskPriority, d.taskDueMinutes ?? null, auth.session.userId],
+        "INSERT INTO automation_rules (tenant_id, name, trigger_event, only_status, task_title, task_priority, task_due_minutes, created_by, action_type, message_template) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
+        [tenantId, d.name, d.triggerEvent, status, d.taskTitle, d.taskPriority, d.taskDueMinutes ?? null, auth.session.userId, d.actionType, d.actionType === "mensaje" ? d.messageTemplate!.trim() : null],
       );
       await db.query("INSERT INTO audit_log (tenant_id, actor_id, action, target_type, metadata) VALUES ($1,$2,'automation.created','automation',$3)", [tenantId, auth.session.userId, JSON.stringify({ ruleId: r.rows[0].id, trigger: d.triggerEvent })]);
       return r.rows[0].id as string;

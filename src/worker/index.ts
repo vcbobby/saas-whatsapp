@@ -9,6 +9,7 @@ import { sweepPending } from "@/lib/queue/sweeper";
 import { createInboundHandler, onJobFailed } from "./handler";
 import { indexPending } from "./kb";
 import { deliverDue } from "@/lib/webhooks/deliver";
+import { sendDue } from "@/lib/notifications/send";
 
 const handler = createInboundHandler();
 
@@ -80,6 +81,25 @@ async function deliverWebhooks() {
 }
 const webhookTimer = setInterval(() => void deliverWebhooks(), WEBHOOK_EVERY_MS);
 
+// Avisos automáticos a clientes por WhatsApp (los crean las reglas de «Automatizaciones»).
+const NOTIFY_EVERY_MS = 3_000;
+let notifying = false;
+async function sendNotifications() {
+  if (notifying || closing) return;
+  notifying = true;
+  try {
+    for (let i = 0; i < 10 && !closing; i++) {
+      const c = await sendDue(5);
+      if (c.sent + c.retry + c.omitted + c.failed + c.skipped === 0) break;
+    }
+  } catch (err) {
+    console.error("[worker] avisos a clientes falló:", err instanceof Error ? err.message : err);
+  } finally {
+    notifying = false;
+  }
+}
+const notifyTimer = setInterval(() => void sendNotifications(), NOTIFY_EVERY_MS);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
@@ -88,6 +108,7 @@ async function shutdown(signal: string) {
   clearInterval(timer);
   clearInterval(kbTimer);
   clearInterval(webhookTimer);
+  clearInterval(notifyTimer);
   try {
     await worker.close();
     await closeProducer();

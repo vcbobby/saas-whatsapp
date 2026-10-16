@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { postJson } from "@/lib/client";
-import { PLACEHOLDERS, STATUS_OPTIONS, TRIGGERS, TRIGGER_LABEL } from "@/lib/automations/rules";
+import { MESSAGE_TRIGGERS, PLACEHOLDERS, STATUS_OPTIONS, TRIGGERS, TRIGGER_LABEL } from "@/lib/automations/rules";
 
-interface Rule { id: string; name: string; triggerEvent: string; onlyStatus: string | null; taskTitle: string; taskPriority: number; taskDueMinutes: number | null; active: boolean; runCount: number; lastRunAt: string | null }
-interface Data { max: number; rules: Rule[] }
-interface Form { id: string | null; name: string; triggerEvent: string; onlyStatus: string; taskTitle: string; taskPriority: number; due: string }
+interface Rule { id: string; name: string; triggerEvent: string; onlyStatus: string | null; actionType: "tarea" | "mensaje"; messageTemplate: string | null; taskTitle: string; taskPriority: number; taskDueMinutes: number | null; active: boolean; runCount: number; lastRunAt: string | null }
+interface Note { id: string; ruleName: string | null; customerName: string | null; body: string; status: "pendiente" | "enviado" | "omitido" | "fallido"; reason: string | null; attempts: number; createdAt: string }
+interface Data { max: number; rules: Rule[]; notifications: Note[] }
+interface Form { id: string | null; name: string; triggerEvent: string; onlyStatus: string; actionType: "tarea" | "mensaje"; messageTemplate: string; taskTitle: string; taskPriority: number; due: string }
 
 const PRIORITY = { 1: "Alta", 2: "Normal", 3: "Baja" } as const;
-const EMPTY: Form = { id: null, name: "", triggerEvent: "order.created", onlyStatus: "", taskTitle: "", taskPriority: 2, due: "" };
+const EMPTY: Form = { id: null, name: "", triggerEvent: "order.created", onlyStatus: "", actionType: "tarea", messageTemplate: "", taskTitle: "", taskPriority: 2, due: "" };
+const NOTE_STATUS = { pendiente: "En cola", enviado: "Enviado", omitido: "No se envió", fallido: "Falló" } as const;
+const REASON: Record<string, string> = { sin_conversacion: "no hay conversación con el cliente", baja: "el cliente pidió no recibir avisos", limite_24h: "ya se le enviaron 5 avisos en 24 h", ventana_cerrada: "pasaron más de 24 h desde su último mensaje", sin_whatsapp: "no hay WhatsApp conectado", negocio_inactivo: "negocio inactivo", cola_llena: "demasiados avisos en cola" };
+const reasonText = (r: string | null) => (r ? REASON[r] ?? r.replace(/^[a-z_]+: /, "") : "");
 const fmt = new Intl.DateTimeFormat("es-VE", { dateStyle: "short", timeStyle: "short" });
 const statusesFor = (t: string): readonly string[] => (STATUS_OPTIONS as Record<string, readonly string[]>)[t] ?? [];
 const dueText = (m: number | null) => (m === null ? "sin plazo" : m % 1440 === 0 ? `plazo de ${m / 1440} día(s)` : m % 60 === 0 ? `plazo de ${m / 60} h` : `plazo de ${m} min`);
@@ -45,11 +49,11 @@ export function AutomationsManager() {
     e.preventDefault();
     if (!form) return;
     const dueNum = form.due.trim() === "" ? null : Number(form.due);
-    const base = { name: form.name, triggerEvent: form.triggerEvent, onlyStatus: form.onlyStatus || null, taskTitle: form.taskTitle, taskPriority: form.taskPriority, taskDueMinutes: dueNum };
+    const base = { name: form.name, triggerEvent: form.triggerEvent, onlyStatus: form.onlyStatus || null, actionType: form.actionType, messageTemplate: form.actionType === "mensaje" ? form.messageTemplate : null, taskTitle: form.taskTitle, taskPriority: form.taskPriority, taskDueMinutes: dueNum };
     const ok = form.id ? await run({ action: "edit", id: form.id, ...base }) : await run(base, "/api/automations");
     if (ok) setForm(null);
   }
-  const edit = (r: Rule) => setForm({ id: r.id, name: r.name, triggerEvent: r.triggerEvent, onlyStatus: r.onlyStatus ?? "", taskTitle: r.taskTitle, taskPriority: r.taskPriority, due: r.taskDueMinutes === null ? "" : String(r.taskDueMinutes) });
+  const edit = (r: Rule) => setForm({ id: r.id, name: r.name, triggerEvent: r.triggerEvent, onlyStatus: r.onlyStatus ?? "", actionType: r.actionType, messageTemplate: r.messageTemplate ?? "", taskTitle: r.taskTitle, taskPriority: r.taskPriority, due: r.taskDueMinutes === null ? "" : String(r.taskDueMinutes) });
   const title = (e: string) => (TRIGGER_LABEL as Record<string, { title: string }>)[e]?.title ?? e;
 
   if (loadError) return <p className="alert-error" role="alert">{loadError}</p>;
@@ -58,7 +62,7 @@ export function AutomationsManager() {
   return (
     <div className="flex max-w-[900px] flex-col gap-6">
       <p className="muted-dark text-[15px]">
-        Una regla dice: «cuando pase esto, crea esta tarea en Hoy». Así nadie se olvida de confirmar un pedido, llamar a quien pidió hablar con una persona, etc. Máximo {data.max} reglas.
+        Una regla dice: «cuando pase esto, crea una tarea en Hoy» o «avisa al cliente por WhatsApp». Así nadie se olvida de confirmar un pedido, de llamar a quien pidió hablar con una persona, etc. Máximo {data.max} reglas.
       </p>
       <div aria-live="assertive" role="alert">{error && <p className="alert-error">{error}</p>}</div>
 
@@ -70,8 +74,15 @@ export function AutomationsManager() {
             <span className="badge" style={r.active ? undefined : { background: "var(--color-signal-yellow)", color: "var(--color-ink)" }}>{r.active ? "Activa" : "Desactivada"}</span>
           </div>
           <p>Cuando: <strong>{title(r.triggerEvent)}</strong>{r.onlyStatus ? ` (nuevo estado: ${r.onlyStatus.replace("_", " ")})` : ""}</p>
-          <p>Crear tarea: «{r.taskTitle}» · prioridad {PRIORITY[r.taskPriority as 1 | 2 | 3]} · {dueText(r.taskDueMinutes)}</p>
-          <p className="muted text-[13px]">{r.runCount === 0 ? "Aún no se ha ejecutado." : `Se ejecutó ${r.runCount} vez/veces; la última: ${r.lastRunAt ? fmt.format(new Date(r.lastRunAt)) : "—"}.`}</p>
+          {r.actionType === "mensaje" ? (
+            <>
+              <p>Avisar al cliente por WhatsApp: «{r.messageTemplate}»</p>
+              <p className="muted text-[14px]">Si no se puede (pasaron más de 24 h de su último mensaje, etc.), se crea la tarea «{r.taskTitle}» · prioridad {PRIORITY[r.taskPriority as 1 | 2 | 3]} · {dueText(r.taskDueMinutes)}</p>
+            </>
+          ) : (
+            <p>Crear tarea: «{r.taskTitle}» · prioridad {PRIORITY[r.taskPriority as 1 | 2 | 3]} · {dueText(r.taskDueMinutes)}</p>
+          )}
+          <p className="muted text-[13px]">{r.runCount === 0 ? "Aún no se ha ejecutado." : `Se ejecutó ${r.runCount} vez/veces; la última: ${r.lastRunAt ? fmt.format(new Date(r.lastRunAt)).replace(/\.$/, "") : "—"}`}</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn btn-sm btn-ghost-light" disabled={busy} onClick={() => edit(r)}>Editar</button>
             <button type="button" className="btn btn-sm btn-ghost-light" disabled={busy} onClick={() => void run({ action: "toggle", id: r.id, active: !r.active })}>{r.active ? "Desactivar" : "Activar"}</button>
@@ -79,6 +90,28 @@ export function AutomationsManager() {
           </div>
         </section>
       ))}
+
+      {data.notifications.length > 0 && (
+        <section className="card-light flex flex-col gap-2" style={{ padding: 20 }} aria-label="Avisos a clientes">
+          <h2 className="text-[20px]">Últimos avisos a clientes</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[14px]">
+              <caption className="sr-only">Avisos automáticos enviados o intentados por las reglas</caption>
+              <thead><tr><th scope="col" className="py-1 pr-3">Cuándo</th><th scope="col" className="pr-3">Cliente</th><th scope="col" className="pr-3">Mensaje</th><th scope="col">Estado</th></tr></thead>
+              <tbody>
+                {data.notifications.map((n) => (
+                  <tr key={n.id}>
+                    <td className="py-1 pr-3 align-top">{fmt.format(new Date(n.createdAt))}</td>
+                    <td className="pr-3 align-top">{n.customerName ?? "—"}</td>
+                    <td className="pr-3 align-top">{n.body}</td>
+                    <td className="align-top">{NOTE_STATUS[n.status]}{n.status !== "enviado" && n.status !== "pendiente" && n.reason ? ` · ${reasonText(n.reason)}` : ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {form ? (
         <form onSubmit={save} className="card-light flex flex-col gap-4" style={{ padding: 20 }} aria-label={form.id ? "Editar regla" : "Nueva regla"}>
@@ -88,7 +121,7 @@ export function AutomationsManager() {
           </div>
           <div className="field">
             <label htmlFor={`${uid}-t`}>Cuando…</label>
-            <select id={`${uid}-t`} className="input" value={form.triggerEvent} onChange={(e) => setForm({ ...form, triggerEvent: e.target.value, onlyStatus: "" })}>
+            <select id={`${uid}-t`} className="input" value={form.triggerEvent} onChange={(e) => setForm({ ...form, triggerEvent: e.target.value, onlyStatus: "", actionType: (MESSAGE_TRIGGERS as readonly string[]).includes(e.target.value) ? form.actionType : "tarea" })}>
               {TRIGGERS.map((t) => <option key={t} value={t}>{TRIGGER_LABEL[t].title}</option>)}
             </select>
             <p className="hint">{(TRIGGER_LABEL as Record<string, { hint: string }>)[form.triggerEvent]?.hint}</p>
@@ -103,7 +136,21 @@ export function AutomationsManager() {
             </div>
           )}
           <div className="field">
-            <label htmlFor={`${uid}-ti`}>Título de la tarea</label>
+            <label htmlFor={`${uid}-a`}>Hacer esto</label>
+            <select id={`${uid}-a`} className="input" value={form.actionType} onChange={(e) => setForm({ ...form, actionType: e.target.value as "tarea" | "mensaje" })}>
+              <option value="tarea">Crear una tarea en «Hoy»</option>
+              <option value="mensaje" disabled={!(MESSAGE_TRIGGERS as readonly string[]).includes(form.triggerEvent)}>Avisar al cliente por WhatsApp</option>
+            </select>
+          </div>
+          {form.actionType === "mensaje" && (
+            <div className="field">
+              <label htmlFor={`${uid}-m`}>Mensaje para el cliente</label>
+              <textarea id={`${uid}-m`} className="input" rows={3} required maxLength={600} value={form.messageTemplate} onChange={(e) => setForm({ ...form, messageTemplate: e.target.value })} placeholder="Ej.: Hola {cliente}, tu pedido #{numero} fue confirmado. Total: {total}." />
+              <p className="hint">Solo se envía dentro de las 24 h siguientes al último mensaje del cliente (regla de WhatsApp), máximo 5 avisos por cliente al día, y no se envía a quien escriba BAJA. Puedes usar: {PLACEHOLDERS.join(" ")}</p>
+            </div>
+          )}
+          <div className="field">
+            <label htmlFor={`${uid}-ti`}>{form.actionType === "mensaje" ? "Tarea si no se puede enviar el mensaje" : "Título de la tarea"}</label>
             <input id={`${uid}-ti`} className="input" required maxLength={120} value={form.taskTitle} onChange={(e) => setForm({ ...form, taskTitle: e.target.value })} placeholder="Ej.: Preparar pedido {numero} de {cliente}" />
             <p className="hint">Puedes usar: {PLACEHOLDERS.join(" ")}</p>
           </div>
