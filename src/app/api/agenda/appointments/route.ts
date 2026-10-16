@@ -5,6 +5,7 @@ import { withTenant } from "@/lib/db";
 import { activeServiceDuration, isStartFree, loadSettings } from "@/lib/agenda/load";
 import { MAX_SLOT_DAYS } from "@/lib/agenda/slots";
 import { addDays, isValidYmd, localToUtc } from "@/lib/agenda/tz";
+import { isSlotConflict } from "@/lib/agenda/conflict";
 
 const listQuery = z.object({
   date: z.string().refine(isValidYmd, "Fecha inválida (AAAA-MM-DD)"),
@@ -84,7 +85,7 @@ export const POST = route(async (req) => {
       );
       return r.rows[0].id as string;
     } catch (e) {
-      if ((e as { code?: string }).code === "23P01") return "ocupado" as const;
+      if (isSlotConflict(e)) return "ocupado" as const;
       throw e;
     }
   });

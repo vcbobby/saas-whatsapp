@@ -17,6 +17,7 @@ import { addDays, localDate, localToUtc } from "@/lib/agenda/tz";
 import { encryptSecret } from "@/lib/crypto";
 import { getPool, withTenant } from "@/lib/db";
 import { closeLockClient } from "@/lib/queue/lock";
+import { isSlotConflict } from "@/lib/agenda/conflict";
 
 
 const RUN = randomUUID().slice(0, 8);
@@ -191,6 +192,24 @@ describe("citas: crear", () => {
     for (let i = 0; i < active.length; i++) for (let j = i + 1; j < active.length; j++) {
       expect(Date.parse(active[i].endsAt) <= Date.parse(active[j].startsAt) || Date.parse(active[j].endsAt) <= Date.parse(active[i].startsAt)).toBe(true);
     }
+  });
+
+  it("CARRERA repetida: ni un solo error 500 (un bloqueo mutuo de la base cuenta como horario ocupado)", async () => {
+    const { t, s } = await ready("c5b");
+    const seen: Record<number, number> = {};
+    for (let i = 1; i <= 40; i++) {
+      const { date } = future(i);
+      const rs = await Promise.all(["09:00", "09:30", "10:00"].map((hm) => book(t, s, at(date, hm))));
+      for (const r of rs) seen[r.status] = (seen[r.status] ?? 0) + 1;
+      expect(rs.some((r) => r.status === 201)).toBe(true);
+    }
+    expect(Object.keys(seen).map(Number).filter((c) => c !== 201 && c !== 409)).toEqual([]);
+  }, 60_000);
+
+  it("isSlotConflict reconoce solapamiento (23P01) y bloqueo mutuo (40P01), y nada más", () => {
+    expect(isSlotConflict({ code: "23P01" })).toBe(true);
+    expect(isSlotConflict({ code: "40P01" })).toBe(true);
+    for (const x of [{ code: "23505" }, { code: "40001" }, {}, null, undefined, "40P01", new Error("x")]) expect(isSlotConflict(x)).toBe(false);
   });
 
   it("rechaza lo que NO es un hueco libre: fuera de horario, fuera de paso, pasado, muy lejano, día bloqueado", async () => {

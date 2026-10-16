@@ -3,6 +3,7 @@ import { activeServiceDuration, isStartFree, loadSettings, slotsForService } fro
 import { localDate } from "@/lib/agenda/tz";
 import { normalizeUntrusted } from "./safety";
 import { treatmentOf, type AgentStyle } from "./style";
+import { isSlotConflict } from "@/lib/agenda/conflict";
 
 type Db = Pick<PoolClient, "query">;
 
@@ -173,7 +174,7 @@ export async function createAgentAppointment(
     return { kind: "ok", id, serviceName: service.name, startsAt: start.toISOString(), name };
   } catch (e) {
     await db.query("ROLLBACK TO SAVEPOINT cita");
-    if ((e as { code?: string }).code === "23P01") return { kind: "ocupado" };
+    if (isSlotConflict(e)) return { kind: "ocupado" };
     throw e;
   }
 }

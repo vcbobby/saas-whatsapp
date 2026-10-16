@@ -61,6 +61,9 @@ export function AppHeader({
             <Link href="/agente" className="btn btn-text btn-sm">
               Asistente
             </Link>
+            <Link href="/automatizaciones" className="btn btn-text btn-sm">
+              Automatizaciones
+            </Link>
             <Link href="/conexiones" className="btn btn-text btn-sm">
               Conexiones
             </Link>
