@@ -1,4 +1,5 @@
 import { getPool, withTenant } from "@/lib/db";
+import { optOutIntent } from "@/lib/notifications/send";
 import type { TenantBatch } from "./payload";
 
 export interface IngestResult {
@@ -57,6 +58,9 @@ export async function ingestBatch(batch: TenantBatch): Promise<IngestResult> {
       );
       if (ins.rowCount) {
         newMessages++;
+        // El cliente pide dejar (BAJA/STOP) o volver a recibir (ALTA) los avisos automáticos del negocio.
+        const intent = m.type === "text" ? optOutIntent(m.body) : null;
+        if (intent) await db.query("UPDATE contacts SET notifications_off = $3 WHERE tenant_id = $1 AND id = $2", [tenantId, contactId, intent === "off"]);
         inbound.push({ tenantId, messageId: ins.rows[0].id });
         await db.query(
           `UPDATE conversations SET last_message_at = GREATEST(COALESCE(last_message_at, $3), $3)
