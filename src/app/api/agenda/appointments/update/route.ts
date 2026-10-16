@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
 import { isStartFree } from "@/lib/agenda/load";
+import { isSlotConflict } from "@/lib/agenda/conflict";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("confirm"), id: z.uuid() }),
@@ -63,7 +64,7 @@ export const POST = route(async (req) => {
         }
       }
     } catch (e) {
-      if ((e as { code?: string }).code === "23P01") return "ocupado";
+      if (isSlotConflict(e)) return "ocupado";
       throw e;
     }
   });
