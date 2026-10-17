@@ -10,6 +10,7 @@ import { createInboundHandler, onJobFailed } from "./handler";
 import { indexPending } from "./kb";
 import { deliverDue } from "@/lib/webhooks/deliver";
 import { sendDue } from "@/lib/notifications/send";
+import { tickAutomations } from "@/lib/automations/tick";
 
 const handler = createInboundHandler();
 
@@ -100,6 +101,21 @@ async function sendNotifications() {
 }
 const notifyTimer = setInterval(() => void sendNotifications(), NOTIFY_EVERY_MS);
 
+// Reglas por tiempo («24 h antes de una cita», «pedido sin confirmar»): se revisan cada 30 s solo los negocios que las usan.
+let ticking = false;
+async function tickTime() {
+  if (ticking || closing) return;
+  ticking = true;
+  try {
+    await tickAutomations();
+  } catch (err) {
+    console.error("[worker] reglas por tiempo falló:", err instanceof Error ? err.message : err);
+  } finally {
+    ticking = false;
+  }
+}
+const tickTimer = setInterval(() => void tickTime(), 15_000);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
@@ -109,6 +125,7 @@ async function shutdown(signal: string) {
   clearInterval(kbTimer);
   clearInterval(webhookTimer);
   clearInterval(notifyTimer);
+  clearInterval(tickTimer);
   try {
     await worker.close();
     await closeProducer();
