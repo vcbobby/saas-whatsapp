@@ -2,19 +2,20 @@
 
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { postJson } from "@/lib/client";
-import { MESSAGE_TRIGGERS, PLACEHOLDERS, STATUS_OPTIONS, TRIGGERS, TRIGGER_LABEL } from "@/lib/automations/rules";
+import { MESSAGE_TRIGGERS, OFFSET_LABEL, PLACEHOLDERS, STATUS_OPTIONS, TIME_TRIGGERS, TRIGGERS, TRIGGER_LABEL } from "@/lib/automations/rules";
 
-interface Rule { id: string; name: string; triggerEvent: string; onlyStatus: string | null; actionType: "tarea" | "mensaje"; messageTemplate: string | null; taskTitle: string; taskPriority: number; taskDueMinutes: number | null; active: boolean; runCount: number; lastRunAt: string | null }
+interface Rule { id: string; name: string; triggerEvent: string; onlyStatus: string | null; actionType: "tarea" | "mensaje"; messageTemplate: string | null; taskTitle: string; taskPriority: number; taskDueMinutes: number | null; offsetMinutes: number | null; active: boolean; runCount: number; lastRunAt: string | null }
 interface Note { id: string; ruleName: string | null; customerName: string | null; body: string; status: "pendiente" | "enviado" | "omitido" | "fallido"; reason: string | null; attempts: number; createdAt: string }
 interface Data { max: number; rules: Rule[]; notifications: Note[] }
-interface Form { id: string | null; name: string; triggerEvent: string; onlyStatus: string; actionType: "tarea" | "mensaje"; messageTemplate: string; taskTitle: string; taskPriority: number; due: string }
+interface Form { id: string | null; name: string; triggerEvent: string; onlyStatus: string; actionType: "tarea" | "mensaje"; messageTemplate: string; taskTitle: string; taskPriority: number; due: string; offset: string }
 
 const PRIORITY = { 1: "Alta", 2: "Normal", 3: "Baja" } as const;
-const EMPTY: Form = { id: null, name: "", triggerEvent: "order.created", onlyStatus: "", actionType: "tarea", messageTemplate: "", taskTitle: "", taskPriority: 2, due: "" };
+const EMPTY: Form = { id: null, name: "", triggerEvent: "order.created", onlyStatus: "", actionType: "tarea", messageTemplate: "", taskTitle: "", taskPriority: 2, due: "", offset: "" };
 const NOTE_STATUS = { pendiente: "En cola", enviado: "Enviado", omitido: "No se envió", fallido: "Falló" } as const;
 const REASON: Record<string, string> = { sin_conversacion: "no hay conversación con el cliente", baja: "el cliente pidió no recibir avisos", limite_24h: "ya se le enviaron 5 avisos en 24 h", ventana_cerrada: "pasaron más de 24 h desde su último mensaje", sin_whatsapp: "no hay WhatsApp conectado", negocio_inactivo: "negocio inactivo", cola_llena: "demasiados avisos en cola" };
 const reasonText = (r: string | null) => (r ? REASON[r] ?? r.replace(/^[a-z_]+: /, "") : "");
 const fmt = new Intl.DateTimeFormat("es-VE", { dateStyle: "short", timeStyle: "short" });
+const isTime = (t: string) => (TIME_TRIGGERS as readonly string[]).includes(t);
 const statusesFor = (t: string): readonly string[] => (STATUS_OPTIONS as Record<string, readonly string[]>)[t] ?? [];
 const dueText = (m: number | null) => (m === null ? "sin plazo" : m % 1440 === 0 ? `plazo de ${m / 1440} día(s)` : m % 60 === 0 ? `plazo de ${m / 60} h` : `plazo de ${m} min`);
 
@@ -49,11 +50,11 @@ export function AutomationsManager() {
     e.preventDefault();
     if (!form) return;
     const dueNum = form.due.trim() === "" ? null : Number(form.due);
-    const base = { name: form.name, triggerEvent: form.triggerEvent, onlyStatus: form.onlyStatus || null, actionType: form.actionType, messageTemplate: form.actionType === "mensaje" ? form.messageTemplate : null, taskTitle: form.taskTitle, taskPriority: form.taskPriority, taskDueMinutes: dueNum };
+    const base = { name: form.name, triggerEvent: form.triggerEvent, onlyStatus: form.onlyStatus || null, actionType: form.actionType, messageTemplate: form.actionType === "mensaje" ? form.messageTemplate : null, taskTitle: form.taskTitle, taskPriority: form.taskPriority, taskDueMinutes: dueNum, offsetMinutes: isTime(form.triggerEvent) && form.offset.trim() !== "" ? Number(form.offset) : null };
     const ok = form.id ? await run({ action: "edit", id: form.id, ...base }) : await run(base, "/api/automations");
     if (ok) setForm(null);
   }
-  const edit = (r: Rule) => setForm({ id: r.id, name: r.name, triggerEvent: r.triggerEvent, onlyStatus: r.onlyStatus ?? "", actionType: r.actionType, messageTemplate: r.messageTemplate ?? "", taskTitle: r.taskTitle, taskPriority: r.taskPriority, due: r.taskDueMinutes === null ? "" : String(r.taskDueMinutes) });
+  const edit = (r: Rule) => setForm({ id: r.id, name: r.name, triggerEvent: r.triggerEvent, onlyStatus: r.onlyStatus ?? "", actionType: r.actionType, messageTemplate: r.messageTemplate ?? "", taskTitle: r.taskTitle, taskPriority: r.taskPriority, due: r.taskDueMinutes === null ? "" : String(r.taskDueMinutes), offset: r.offsetMinutes === null ? "" : String(r.offsetMinutes) });
   const title = (e: string) => (TRIGGER_LABEL as Record<string, { title: string }>)[e]?.title ?? e;
 
   if (loadError) return <p className="alert-error" role="alert">{loadError}</p>;
@@ -73,7 +74,7 @@ export function AutomationsManager() {
             <h2 className="text-[20px]">{r.name}</h2>
             <span className="badge" style={r.active ? undefined : { background: "var(--color-signal-yellow)", color: "var(--color-ink)" }}>{r.active ? "Activa" : "Desactivada"}</span>
           </div>
-          <p>Cuando: <strong>{title(r.triggerEvent)}</strong>{r.onlyStatus ? ` (nuevo estado: ${r.onlyStatus.replace("_", " ")})` : ""}</p>
+          <p>Cuando: <strong>{title(r.triggerEvent)}</strong>{r.onlyStatus ? ` (nuevo estado: ${r.onlyStatus.replace("_", " ")})` : ""}{r.offsetMinutes !== null ? ` · ${r.offsetMinutes} min` : ""}</p>
           {r.actionType === "mensaje" ? (
             <>
               <p>Avisar al cliente por WhatsApp: «{r.messageTemplate}»</p>
@@ -121,11 +122,17 @@ export function AutomationsManager() {
           </div>
           <div className="field">
             <label htmlFor={`${uid}-t`}>Cuando…</label>
-            <select id={`${uid}-t`} className="input" value={form.triggerEvent} onChange={(e) => setForm({ ...form, triggerEvent: e.target.value, onlyStatus: "", actionType: (MESSAGE_TRIGGERS as readonly string[]).includes(e.target.value) ? form.actionType : "tarea" })}>
+            <select id={`${uid}-t`} className="input" value={form.triggerEvent} onChange={(e) => setForm({ ...form, triggerEvent: e.target.value, onlyStatus: "", offset: isTime(e.target.value) ? form.offset : "", actionType: (MESSAGE_TRIGGERS as readonly string[]).includes(e.target.value) ? form.actionType : "tarea" })}>
               {TRIGGERS.map((t) => <option key={t} value={t}>{TRIGGER_LABEL[t].title}</option>)}
             </select>
             <p className="hint">{(TRIGGER_LABEL as Record<string, { hint: string }>)[form.triggerEvent]?.hint}</p>
           </div>
+          {isTime(form.triggerEvent) && (
+            <div className="field">
+              <label htmlFor={`${uid}-o`}>{OFFSET_LABEL[form.triggerEvent as keyof typeof OFFSET_LABEL]}</label>
+              <input id={`${uid}-o`} className="input" type="number" inputMode="numeric" min={1} max={43200} step={1} required value={form.offset} onChange={(e) => setForm({ ...form, offset: e.target.value })} />
+            </div>
+          )}
           {statusesFor(form.triggerEvent).length > 0 && (
             <div className="field">
               <label htmlFor={`${uid}-s`}>Solo si el nuevo estado es</label>

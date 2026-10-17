@@ -2,13 +2,13 @@ import { z } from "zod";
 import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
-import { MAX_RULES, actionError, ruleFields, statusOk } from "@/lib/automations/rules";
+import { MAX_RULES, actionError, offsetFor, ruleFields, statusOk } from "@/lib/automations/rules";
 
 export const createSchema = z.object(ruleFields);
 
 export const ruleRow = (r: Record<string, unknown>) => ({
   id: r.id, name: r.name, triggerEvent: r.trigger_event, onlyStatus: r.only_status, taskTitle: r.task_title,
-  actionType: r.action_type, messageTemplate: r.message_template, taskPriority: r.task_priority, taskDueMinutes: r.task_due_minutes, active: r.active, runCount: r.run_count, lastRunAt: r.last_run_at,
+  offsetMinutes: r.offset_minutes, actionType: r.action_type, messageTemplate: r.message_template, taskPriority: r.task_priority, taskDueMinutes: r.task_due_minutes, active: r.active, runCount: r.run_count, lastRunAt: r.last_run_at,
 });
 
 /** Reglas del negocio. */
@@ -45,8 +45,8 @@ export const POST = route(async (req) => {
   try {
     const id = await withTenant(tenantId, async (db) => {
       const r = await db.query(
-        "INSERT INTO automation_rules (tenant_id, name, trigger_event, only_status, task_title, task_priority, task_due_minutes, created_by, action_type, message_template) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id",
-        [tenantId, d.name, d.triggerEvent, status, d.taskTitle, d.taskPriority, d.taskDueMinutes ?? null, auth.session.userId, d.actionType, d.actionType === "mensaje" ? d.messageTemplate!.trim() : null],
+        "INSERT INTO automation_rules (tenant_id, name, trigger_event, only_status, task_title, task_priority, task_due_minutes, created_by, action_type, message_template, offset_minutes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id",
+        [tenantId, d.name, d.triggerEvent, status, d.taskTitle, d.taskPriority, d.taskDueMinutes ?? null, auth.session.userId, d.actionType, d.actionType === "mensaje" ? d.messageTemplate!.trim() : null, offsetFor(d)],
       );
       await db.query("INSERT INTO audit_log (tenant_id, actor_id, action, target_type, metadata) VALUES ($1,$2,'automation.created','automation',$3)", [tenantId, auth.session.userId, JSON.stringify({ ruleId: r.rows[0].id, trigger: d.triggerEvent })]);
       return r.rows[0].id as string;
