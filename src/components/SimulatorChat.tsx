@@ -22,6 +22,7 @@ interface State {
 const REASON: Record<string, string> = {
   pedido_de_persona: "El cliente pidió hablar con una persona.",
   limite_diario: "Se alcanzó el tope diario de respuestas.",
+  limite_plan: "Se alcanzó el tope mensual de respuestas de tu plan.",
   envio_rechazado: "Meta rechazó el envío del mensaje.",
   envio_incierto: "No se sabe si el mensaje salió; una persona debe revisarlo.",
   limite_contacto: "Este cliente alcanzó el tope de respuestas por hora o por día.",

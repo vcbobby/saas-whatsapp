@@ -54,6 +54,8 @@ async function register(name: string, opts: { agent?: boolean; instructions?: st
 }
 
 type T = Awaited<ReturnType<typeof register>>;
+let planSeq = 0;
+const planRows: string[] = [];
 let t0 = Math.floor(Date.now() / 1000) - 600;
 /** Crea un mensaje entrante (como lo haría el webhook) y devuelve su id. */
 async function inbound(t: T, waId: string, body: string | null, type = "text") {
@@ -97,6 +99,7 @@ afterAll(async () => {
       c.release();
     }
   }
+  if (planRows.length) await owner.query("DELETE FROM plans WHERE id = ANY($1)", [planRows]);
   await owner.end();
   await getPool().end();
 });
@@ -290,6 +293,53 @@ describe("pasar a una persona", () => {
     expect(await runAgent(job(t, await inbound(t, wa, "dos")), d.raw)).toBe("limit_reached");
     expect(d.send).toHaveBeenCalledTimes(1);
     expect(await convOf(t)).toEqual({ status: "human", handoff_reason: "limite_diario" });
+  });
+
+  it("tope mensual del plan: al llegar no responde y pasa a una persona; sin tope sigue; el mes anterior no cuenta", async () => {
+    const plan = async (replies: number | null) => {
+      const slug = `ag-${RUN}-${planSeq++}`;
+      const r = await owner.query<{ id: string }>("INSERT INTO plans (slug, name, position, max_replies_month, max_members) VALUES ($1,$1,99,$2,3) RETURNING id", [slug, replies]);
+      planRows.push(r.rows[0]!.id);
+      return r.rows[0]!.id;
+    };
+    const assign = async (t: T, planId: string) => {
+      const c = await owner.connect();
+      try {
+        await c.query("BEGIN");
+        await c.query("SELECT set_config('app.tenant_id', $1, true)", [t.tenantId]);
+        await c.query("ALTER TABLE tenants DISABLE TRIGGER tenants_plan_guard");
+        await c.query("UPDATE tenants SET plan_id = $2 WHERE id = $1", [t.tenantId, planId]);
+        await c.query("ALTER TABLE tenants ENABLE TRIGGER tenants_plan_guard");
+        await c.query("COMMIT");
+      } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
+    };
+    const usage = (t: T, day: string, n: number) => withTenant(t.tenantId, (db) => db.query(`INSERT INTO agent_usage_daily (tenant_id, day, replies) VALUES ($1, ${day}, $2)`, [t.tenantId, n]));
+
+    const t = await register("plan-tope");
+    await assign(t, await plan(2));
+    await usage(t, "(date_trunc('month', now() AT TIME ZONE 'utc') - interval '1 day')::date", 999); // mes pasado: no cuenta
+    await usage(t, "(now() AT TIME ZONE 'utc')::date", 1);
+    const wa = newWaId();
+    const d = deps();
+    expect(await runAgent(job(t, await inbound(t, wa, "uno")), d.raw)).toBe("replied"); // la respuesta suma 1 → total 2
+    expect(await runAgent(job(t, await inbound(t, wa, "dos")), d.raw)).toBe("limit_reached");
+    expect(d.send).toHaveBeenCalledTimes(1);
+    expect(await convOf(t)).toEqual({ status: "human", handoff_reason: "limite_plan" });
+    const task = await withTenant(t.tenantId, async (db) => (await db.query("SELECT detail FROM work_items WHERE type = 'atencion_humana'")).rows);
+    expect(task[0].detail).toMatch(/tope mensual/);
+
+    const t2 = await register("plan-sin-tope"); // NULL = sin tope
+    await assign(t2, await plan(null));
+    await usage(t2, "(now() AT TIME ZONE 'utc')::date", 100000);
+    const wa2 = newWaId();
+    expect(await runAgent(job(t2, await inbound(t2, wa2, "hola")), deps().raw)).toBe("replied");
+
+    const t3 = await register("plan-cero"); // 0 = no responde nunca
+    await assign(t3, await plan(0));
+    const d3 = deps();
+    expect(await runAgent(job(t3, await inbound(t3, newWaId(), "hola")), d3.raw)).toBe("limit_reached");
+    expect(d3.send).not.toHaveBeenCalled();
+    expect(d3.llm.generate).not.toHaveBeenCalled();
   });
 
   it("si una persona toma la conversación mientras la IA piensa, no se envía nada", async () => {

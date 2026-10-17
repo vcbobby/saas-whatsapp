@@ -42,6 +42,17 @@ export const tenantStatusSchema = z.object({
   status: z.enum(["trial", "active", "past_due", "suspended"]),
 });
 
+export const tenantPlanSchema = z.object({ tenantId: z.uuid(), planId: z.uuid() });
+
+export const planUpdateSchema = z.object({
+  planId: z.uuid(),
+  name: z.string().trim().min(1, "Ponle un nombre").max(60),
+  maxRepliesMonth: z.number().int().min(0).max(10_000_000).nullable(),
+  maxMembers: z.number().int().min(1).max(1000),
+  modules: z.array(z.enum(["agenda", "catalogo", "copiloto", "automatizaciones"])).max(4),
+  active: z.boolean(),
+});
+
 // "Panadería La Esquina" -> "panaderia-la-esquina-a1b2c3"
 export function makeSlug(name: string, randomSuffix: string): string {
   const base = name

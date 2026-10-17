@@ -4,7 +4,7 @@ import { errorResponse } from "./http";
 export function teamErrorResponse(err: unknown): Response | null {
   const e = err as { code?: string };
   if (e.code === "23505") return errorResponse(409, "ya_es_miembro", "Esa persona ya forma parte del equipo.");
-  if (e.code === "54000") return errorResponse(409, "limite_equipo", "Llegaste al máximo de personas del equipo.");
+  if (e.code === "54000") return errorResponse(409, "limite_equipo", "Llegaste al máximo de personas que incluye tu plan (miembros e invitaciones pendientes).");
   if (e.code === "22023") return errorResponse(400, "datos_invalidos", "Datos inválidos.");
   if (e.code === "42501") return errorResponse(403, "sin_permiso", "No tienes permiso para esto.");
   if (e.code === "P0002") return errorResponse(404, "no_encontrado", "No encontrado.");

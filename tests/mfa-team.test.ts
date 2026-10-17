@@ -324,6 +324,16 @@ describe("equipo e invitaciones", () => {
 
   it("un admin solo invita y quita agentes; solo el dueño cambia roles; el dueño no se toca", async () => {
     const o = await register("c3");
+    // Esta prueba necesita más de 3 personas: se pasa el negocio a un plan más grande (como haría un súper admin).
+    const c = await owner.connect();
+    try {
+      await c.query("BEGIN");
+      await c.query("SELECT set_config('app.tenant_id', $1, true)", [o.tenantId]);
+      await c.query("ALTER TABLE tenants DISABLE TRIGGER tenants_plan_guard");
+      await c.query("UPDATE tenants SET plan_id = (SELECT id FROM plans WHERE slug = 'plan-3') WHERE id = $1", [o.tenantId]);
+      await c.query("ALTER TABLE tenants ENABLE TRIGGER tenants_plan_guard");
+      await c.query("COMMIT");
+    } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
     const tAdmin = tokenOf((await invite(o.cookie, email("c3-adm"), "admin")).body.inviteUrl);
     const admin = cookieOf(await inviteSignup(req("POST", "/api/invitations/signup", undefined, { token: tAdmin, password: PASSWORD })));
     const tAg = tokenOf((await invite(o.cookie, email("c3-ag"), "agent")).body.inviteUrl);
@@ -357,7 +367,7 @@ describe("equipo e invitaciones", () => {
     expect(info.tenant).toBeNull();
   });
 
-  it("revocar invita­ción la invalida; no se puede invitar a un miembro ni pasar de 25", async () => {
+  it("revocar invita­ción la invalida; no se puede invitar a un miembro ni pasar del tope del plan (3 personas)", async () => {
     const o = await register("c5");
     const inv = await invite(o.cookie, email("c5-x"), "agent");
     const list = await (await teamGet(req("GET", "/api/team", o.cookie))).json();
@@ -367,7 +377,7 @@ describe("equipo e invitaciones", () => {
     expect(dead.status).toBe(404);
     expect((await invite(o.cookie, o.email, "agent")).status).toBe(409);
 
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 2; i++) { // el dueño + 2 = 3, el tope del plan por defecto
       const r = await invite(o.cookie, email(`c5-m${i}`), "agent");
       expect(r.status).toBe(201);
     }

@@ -1,3 +1,5 @@
+import { PlanEditor } from "@/components/PlanEditor";
+import { rowToPlan } from "@/lib/plans/usage";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
@@ -32,18 +34,23 @@ async function AdminContent() {
   if (!auth.session.isSuperAdmin) notFound(); // para el resto, esta página "no existe"
 
   const r = await getPool().query("SELECT * FROM admin_list_tenants($1)", [auth.tokenHash]);
+  const planRows = (await getPool().query("SELECT * FROM plans ORDER BY position, name")).rows;
+  const plans = planRows.map((r) => ({ ...rowToPlan(r), active: Boolean(r.active), isDefault: Boolean(r.is_default) }));
   const fmt = new Intl.DateTimeFormat("es-VE", { dateStyle: "medium" });
 
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader email={auth.session.email} roleLabel="Súper admin" showWork={false} />
       <main className="container-app flex-1 pb-24 pt-8">
-        <p className="eyebrow eyebrow--dark">Administración</p>
-        <h1 className="mt-3 text-[32px] sm:text-[48px]">Negocios</h1>
+        <p className="eyebrow eyebrow--dark">Solo súper admin</p>
+        <h1 className="mt-3 text-[32px] sm:text-[48px]">Administración</h1>
         <p className="muted-dark mt-3 max-w-xl text-sm">
           Entrar como soporte exige un motivo, dura 30 minutos como máximo y queda en el registro de auditoría del negocio.
         </p>
 
+        <PlanEditor plans={plans} />
+
+        <h2 className="mt-12 text-2xl">Negocios</h2>
         {r.rows.length === 0 ? (
           <p className="card-dark mt-10 muted-dark">Todavía no hay negocios registrados.</p>
         ) : (
@@ -59,7 +66,7 @@ async function AdminContent() {
                     <span className="badge">{STATUS_LABEL[t.t_status] ?? t.t_status}</span>
                   </p>
                 </div>
-                <TenantActions tenantId={t.t_id} status={t.t_status} />
+                <TenantActions tenantId={t.t_id} status={t.t_status} planId={t.t_plan_id} plans={plans.map((p) => ({ id: p.id, name: p.name, active: p.active }))} />
               </li>
             ))}
           </ul>
