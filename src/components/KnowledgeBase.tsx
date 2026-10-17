@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { ACCEPT, ExtractError, extractText } from "@/lib/kb/extract";
 
 interface Doc {
   id: string;
@@ -19,7 +20,6 @@ const STATUS: Record<Doc["status"], string> = {
 };
 
 const MAX_CHARS = 50_000;
-const MAX_FILE_BYTES = 200_000;
 const neutralBadge = { background: "var(--color-pure-white)", color: "var(--color-deep-abyss)", border: "1px solid var(--color-stone-border)" } as const;
 
 export function KnowledgeBase({ canManage, fakeEmbeddings }: { canManage: boolean; fakeEmbeddings: boolean }) {
@@ -32,6 +32,7 @@ export function KnowledgeBase({ canManage, fakeEmbeddings }: { canManage: boolea
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reading, setReading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -134,13 +135,20 @@ export function KnowledgeBase({ canManage, fakeEmbeddings }: { canManage: boolea
 
   async function onFile(file: File | undefined) {
     setError(null);
+    setInfo(null);
     if (!file) return;
-    if (!/\.(txt|md)$/i.test(file.name)) return setError("Por ahora solo se aceptan archivos .txt o .md. Para un PDF, copia el texto y pégalo aquí.");
-    if (file.size > MAX_FILE_BYTES) return setError("El archivo es muy grande (máximo 200 KB de texto).");
-    const text = await file.text();
-    if (text.length > MAX_CHARS) return setError(`El texto pasa de ${MAX_CHARS.toLocaleString("es")} caracteres. Divídelo en varios documentos.`);
-    setContent(text);
-    if (!title) setTitle(file.name.replace(/\.(txt|md)$/i, "").slice(0, 120));
+    setReading(true);
+    try {
+      const r = await extractText(file);
+      setContent(r.text);
+      if (!title) setTitle(file.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 120));
+      setInfo(`Se leyó «${file.name}». Revisa el texto, corrígelo si hace falta y pulsa «Agregar». ${r.notes.join(" ")}`.trim());
+    } catch (err) {
+      setError(err instanceof ExtractError ? err.message : "No se pudo leer el archivo.");
+      if (fileRef.current) fileRef.current.value = "";
+    } finally {
+      setReading(false);
+    }
   }
 
   return (
@@ -204,13 +212,16 @@ export function KnowledgeBase({ canManage, fakeEmbeddings }: { canManage: boolea
             </p>
           </div>
           <div className="field">
-            <label htmlFor={`${uid}-file`}>O sube un archivo de texto (.txt o .md)</label>
-            <input id={`${uid}-file`} ref={fileRef} type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(e) => void onFile(e.target.files?.[0])} />
+            <label htmlFor={`${uid}-file`}>O sube un archivo (Word, Excel, PDF, TXT, MD o CSV)</label>
+            <input id={`${uid}-file`} ref={fileRef} type="file" accept={ACCEPT} disabled={reading} onChange={(e) => void onFile(e.target.files?.[0])} />
+            <p className="hint">
+              {reading ? "Leyendo el archivo…" : "Se lee en tu navegador y el texto aparece arriba para que lo revises antes de guardar. Máximo 5 MB (200 KB si es TXT). Los PDF escaneados (fotos) no tienen texto que leer."}
+            </p>
           </div>
           <div role="alert" aria-live="assertive">{error && <p className="alert-error">{error}</p>}</div>
           <div role="status" aria-live="polite">{info && <p className="muted">{info}</p>}</div>
           <div className="flex flex-wrap gap-3">
-            <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Guardando…" : editing ? "Guardar cambios" : "Agregar"}</button>
+            <button type="submit" className="btn btn-primary" disabled={busy || reading}>{busy ? "Guardando…" : editing ? "Guardar cambios" : "Agregar"}</button>
             {editing && <button type="button" className="btn btn-secondary" onClick={reset}>Cancelar</button>}
           </div>
           {docs && docs.length > 0 && (
