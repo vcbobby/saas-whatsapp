@@ -3,12 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 
-export function TenantActions({ tenantId, status }: { tenantId: string; status: string }) {
+export function TenantActions({ tenantId, status, planId, plans }: { tenantId: string; status: string; planId: string; plans: { id: string; name: string; active: boolean }[] }) {
   const router = useRouter();
   const uid = useId();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [plan, setPlan] = useState(planId);
 
   async function send(url: string, body: unknown) {
     setPending(true);
@@ -57,6 +58,15 @@ export function TenantActions({ tenantId, status }: { tenantId: string; status: 
         </button>
         <button type="button" className="btn btn-ghost-dark btn-sm" onClick={toggleSuspend} disabled={pending}>
           {status === "suspended" ? "Reactivar" : "Suspender"}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor={`${uid}-plan`} className="text-sm">Plan</label>
+        <select id={`${uid}-plan`} className="input" style={{ background: "#fff", width: "auto" }} value={plan} onChange={(e) => setPlan(e.target.value)} disabled={pending}>
+          {plans.map((p) => <option key={p.id} value={p.id} disabled={!p.active && p.id !== planId}>{p.name}{p.active ? "" : " (inactivo)"}</option>)}
+        </select>
+        <button type="button" className="btn btn-ghost-dark btn-sm" disabled={pending || plan === planId} onClick={async () => { if (await send("/api/admin/tenant-plan", { tenantId, planId: plan })) router.refresh(); }}>
+          Cambiar plan
         </button>
       </div>
       {open && (

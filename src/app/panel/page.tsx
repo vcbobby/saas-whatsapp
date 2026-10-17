@@ -1,3 +1,4 @@
+import { PlanCard } from "@/components/PlanCard";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -100,6 +101,8 @@ async function PanelContent() {
                 Esta cuenta está suspendida. Escríbenos para reactivarla.
               </p>
             )}
+
+            <PlanCard />
 
             <section className="mt-12 grid gap-6 md:grid-cols-3" aria-label="Próximos pasos">
               <article className="card-dark">

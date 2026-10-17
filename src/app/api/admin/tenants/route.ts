@@ -15,6 +15,7 @@ export const GET = route(async (req) => {
       trialEndsAt: t.t_trial_ends_at,
       createdAt: t.t_created_at,
       members: Number(t.t_members),
+      planId: t.t_plan_id,
     })),
   });
 });

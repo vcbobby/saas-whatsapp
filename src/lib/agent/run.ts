@@ -1,3 +1,4 @@
+import { loadPlan, repliesThisMonth } from "@/lib/plans/usage";
 import { getLlmProvider } from "@/lib/ai";
 import type { LlmProvider } from "@/lib/ai/provider";
 import { decryptSecret } from "@/lib/crypto";
@@ -204,6 +205,17 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
   });
   if (today >= env.AGENT_DAILY_REPLY_LIMIT) {
     await handoff(tenantId, ctx.conversationId, "limite_diario");
+    return "limit_reached";
+  }
+
+  // Tope mensual del plan (NULL = sin tope). Al llegar, no se gasta IA y la conversación pasa a una persona.
+  const monthly = await withTenant(tenantId, async (db) => {
+    const plan = await loadPlan(db, tenantId);
+    if (!plan || plan.maxRepliesMonth === null) return false;
+    return (await repliesThisMonth(db, tenantId)) >= plan.maxRepliesMonth;
+  });
+  if (monthly) {
+    await handoff(tenantId, ctx.conversationId, "limite_plan");
     return "limit_reached";
   }
 
