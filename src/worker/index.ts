@@ -116,6 +116,23 @@ async function tickTime() {
 }
 const tickTimer = setInterval(() => void tickTime(), 15_000);
 
+// Suscripciones: quien no renovó pasa a «pago pendiente» (no responde a clientes hasta que pague). Cada 10 min.
+let expiring = false;
+async function expireSubs() {
+  if (expiring || closing) return;
+  expiring = true;
+  try {
+    const r = await getPool().query("SELECT expire_subscriptions() AS n");
+    if (Number(r.rows[0].n) > 0) console.log(`[worker] ${r.rows[0].n} suscripción(es) vencida(s)`);
+  } catch (err) {
+    console.error("[worker] vencimientos falló:", err instanceof Error ? err.message : err);
+  } finally {
+    expiring = false;
+  }
+}
+const expireTimer = setInterval(() => void expireSubs(), 600_000);
+setTimeout(() => void expireSubs(), 5_000);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
@@ -126,6 +143,7 @@ async function shutdown(signal: string) {
   clearInterval(webhookTimer);
   clearInterval(notifyTimer);
   clearInterval(tickTimer);
+  clearInterval(expireTimer);
   try {
     await worker.close();
     await closeProducer();

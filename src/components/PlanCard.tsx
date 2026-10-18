@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PLAN_MODULES, PLAN_MODULE_LABEL, type PlanUsage, type QuotaState } from "@/lib/plans/usage";
 
-type Data = PlanUsage & { repliesState: QuotaState; membersState: QuotaState };
+type Data = PlanUsage & { repliesState: QuotaState; membersState: QuotaState; canPay?: boolean };
 
 function Bar({ used, max, state, label }: { used: number; max: number | null; state: QuotaState; label: string }) {
   const pct = max === null || max === 0 ? 0 : Math.min(100, Math.round((used / max) * 100));
@@ -56,6 +57,9 @@ export function PlanCard() {
           <> No incluye: {PLAN_MODULES.filter((m) => !d.plan.modules.includes(m)).map((m) => PLAN_MODULE_LABEL[m]).join(", ")}.</>
         )}
       </p>
+      {d.canPay && (
+        <p className="mt-4"><Link href="/plan" className="btn btn-ghost-dark btn-sm">Pagar o cambiar de plan</Link></p>
+      )}
     </section>
   );
 }
