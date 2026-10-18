@@ -1,3 +1,4 @@
+import { AdminBilling } from "@/components/AdminBilling";
 import { PlanEditor } from "@/components/PlanEditor";
 import { rowToPlan } from "@/lib/plans/usage";
 import type { Metadata } from "next";
@@ -36,6 +37,13 @@ async function AdminContent() {
   const r = await getPool().query("SELECT * FROM admin_list_tenants($1)", [auth.tokenHash]);
   const planRows = (await getPool().query("SELECT * FROM plans ORDER BY position, name")).rows;
   const plans = planRows.map((r) => ({ ...rowToPlan(r), active: Boolean(r.active), isDefault: Boolean(r.is_default) }));
+  const st = (await getPool().query("SELECT admin_get_payment_settings($1) AS s", [auth.tokenHash])).rows[0].s as Record<string, string | number | null>;
+  const billing = {
+    rate: st.bcv_rate === null ? null : Number(st.bcv_rate), rateAgeHours: st.rate_age_hours === null || st.rate_age_hours === undefined ? null : Number(st.rate_age_hours),
+    pmBank: String(st.pm_bank ?? ""), pmPhone: String(st.pm_phone ?? ""), pmHolderId: String(st.pm_holder_id ?? ""), pmHolderName: String(st.pm_holder_name ?? ""),
+    paypal: String(st.paypal_email ?? ""), binance: String(st.binance_id ?? ""), notes: String(st.notes ?? ""),
+  };
+  const priced = planRows.map((r) => ({ id: String(r.id), name: String(r.name), priceCents: r.price_usd_cents === null ? null : Number(r.price_usd_cents) }));
   const fmt = new Intl.DateTimeFormat("es-VE", { dateStyle: "medium" });
 
   return (
@@ -49,6 +57,8 @@ async function AdminContent() {
         </p>
 
         <PlanEditor plans={plans} />
+
+        <AdminBilling settings={billing} plans={priced} />
 
         <h2 className="mt-12 text-2xl">Negocios</h2>
         {r.rows.length === 0 ? (

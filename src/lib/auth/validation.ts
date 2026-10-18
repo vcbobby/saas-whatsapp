@@ -125,3 +125,26 @@ export const agentSettingsSchema = z.object({
   emojiLevel: z.enum(EMOJI_LEVELS).optional(),
   replyLength: z.enum(REPLY_LENGTHS).optional(),
 });
+
+// ---- Cobros (Paso 18C)
+export const payCreateSchema = z.object({
+  planId: z.uuid(),
+  months: z.number().int().min(1).max(12),
+  method: z.enum(["pago_movil", "paypal", "binance"]),
+});
+export const paySubmitSchema = z.object({
+  paymentId: z.uuid(),
+  reference: z.string().trim().min(4, "La referencia es muy corta").max(60),
+  bank: z.string().trim().max(60).default(""),
+  phone: z.string().trim().max(30).default(""),
+  paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
+  declared: z.string().trim().min(1, "Escribe el monto que pagaste").max(30),
+  proof: z.string().min(100, "Falta la imagen del comprobante").max(3_000_000),
+});
+export const planPriceSchema = z.object({ planId: z.uuid(), priceCents: z.number().int().min(1).max(100_000_000).nullable() });
+export const billingSettingsSchema = z.object({
+  rate: z.number().positive().max(100_000_000).nullable(),
+  pmBank: z.string().trim().max(60), pmPhone: z.string().trim().max(30), pmHolderId: z.string().trim().max(30), pmHolderName: z.string().trim().max(80),
+  paypal: z.string().trim().max(120), binance: z.string().trim().max(80), notes: z.string().trim().max(500),
+});
+export const paymentDecideSchema = z.object({ paymentId: z.uuid(), approve: z.boolean(), reason: z.string().trim().max(300).optional() });
