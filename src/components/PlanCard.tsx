@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PLAN_MODULE_LABEL, type PlanUsage, type QuotaState } from "@/lib/plans/usage";
+import { PLAN_MODULES, PLAN_MODULE_LABEL, type PlanUsage, type QuotaState } from "@/lib/plans/usage";
 
 type Data = PlanUsage & { repliesState: QuotaState; membersState: QuotaState };
 
@@ -52,6 +52,9 @@ export function PlanCard() {
       )}
       <p className="muted-dark mt-4 text-sm">
         Incluye: {d.plan.modules.length ? d.plan.modules.map((m) => PLAN_MODULE_LABEL[m]).join(", ") : "solo atención"}.
+        {PLAN_MODULES.some((m) => !d.plan.modules.includes(m)) && (
+          <> No incluye: {PLAN_MODULES.filter((m) => !d.plan.modules.includes(m)).map((m) => PLAN_MODULE_LABEL[m]).join(", ")}.</>
+        )}
       </p>
     </section>
   );

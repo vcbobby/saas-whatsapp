@@ -1,5 +1,7 @@
 import { errorResponse } from "./http";
 import { can, type Permission } from "./permissions";
+import { moduleForPermission, tenantHasModule } from "@/lib/plans/modules";
+import type { PlanModule } from "@/lib/plans/usage";
 import { effectiveTenant, getSession, tokenHashOf, type Session, type TenantContext } from "./session";
 
 type Guarded<T> = ({ ok: true } & T) | { ok: false; response: Response };
@@ -31,6 +33,8 @@ export async function requireSuperAdmin(
 export async function requireTenant(
   req: Request,
   permission?: Permission,
+  /** Módulo del plan que protege esta ruta. Si no se indica, se deduce del permiso (agenda, catálogo/pedidos, copiloto). */
+  module?: PlanModule,
 ): Promise<Guarded<{ session: Session; ctx: TenantContext }>> {
   const auth = await requireSession(req);
   if (!auth.ok) return auth;
@@ -43,6 +47,10 @@ export async function requireTenant(
   }
   if (permission && !can(ctx.role, permission)) {
     return { ok: false, response: errorResponse(403, "sin_permiso", "No tienes permiso para esto.") };
+  }
+  const needed = module ?? moduleForPermission(permission);
+  if (needed && !(await tenantHasModule(ctx.tenantId, needed))) {
+    return { ok: false, response: errorResponse(403, "modulo_no_incluido", "Tu plan no incluye este módulo.") };
   }
   return { ok: true, session: auth.session, ctx };
 }

@@ -11,7 +11,7 @@ const MODULE_LINK: Record<OptionalModule, { href: string; label: string }> = {
   catalogo: { href: "/catalogo", label: "Catálogo" },
   pedidos: { href: "/pedidos", label: "Pedidos" },
 };
-const ALL_MAIN: ModuleLayout = { main: ["agenda", "catalogo", "pedidos"], more: [] };
+const ALL_MAIN: ModuleLayout = { main: ["agenda", "catalogo", "pedidos"], more: [], team: { copiloto: true, automatizaciones: true } };
 
 async function layoutForSession(): Promise<ModuleLayout> {
   // headers() va FUERA del try: es una señal interna de Next y atraparla rompe la renderización.
@@ -89,18 +89,24 @@ export async function AppHeader({
         {showTeam && (
           // Quien puede gestionar el equipo (dueño y administrador) también gestiona el asistente.
           <>
-            <Link href="/copiloto" className="btn btn-text btn-sm">
+            {modules.team.copiloto && (
+              <Link href="/copiloto" className="btn btn-text btn-sm">
               Copiloto
             </Link>
+            )}
             <Link href="/agente" className="btn btn-text btn-sm">
               Asistente
             </Link>
-            <Link href="/automatizaciones" className="btn btn-text btn-sm">
+            {modules.team.automatizaciones && (
+              <Link href="/automatizaciones" className="btn btn-text btn-sm">
               Automatizaciones
             </Link>
-            <Link href="/conexiones" className="btn btn-text btn-sm">
+            )}
+            {modules.team.automatizaciones && (
+              <Link href="/conexiones" className="btn btn-text btn-sm">
               Conexiones
             </Link>
+            )}
             <Link href="/conocimiento" className="btn btn-text btn-sm">
               Conocimiento
             </Link>

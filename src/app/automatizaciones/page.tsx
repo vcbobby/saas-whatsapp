@@ -1,3 +1,5 @@
+import { ModuleLocked } from "@/components/ModuleLocked";
+import { tenantHasModule } from "@/lib/plans/modules";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -24,6 +26,7 @@ async function AutomationsContent() {
   if (session.needsMfaSetup) redirect("/seguridad");
   const ctx = effectiveTenant(session);
   if (!ctx) redirect("/panel");
+  const locked = !(await tenantHasModule(ctx.tenantId, "automatizaciones"));
   if (!can(ctx.role, "integrations:manage")) redirect("/hoy");
 
   return (
@@ -32,9 +35,13 @@ async function AutomationsContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Automatizaciones</h1>
+        {locked ? <ModuleLocked module="automatizaciones" /> : (
+          <>
         <div className="mt-6">
           <AutomationsManager />
         </div>
+                </>
+        )}
       </main>
     </div>
   );

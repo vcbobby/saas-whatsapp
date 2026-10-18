@@ -13,7 +13,7 @@ export const ruleRow = (r: Record<string, unknown>) => ({
 
 /** Reglas del negocio. */
 export const GET = route(async (req) => {
-  const auth = await requireTenant(req, "integrations:manage");
+  const auth = await requireTenant(req, "integrations:manage", "automatizaciones");
   if (!auth.ok) return auth.response;
   const rows = await withTenant(auth.ctx.tenantId, async (db) =>
     (await db.query("SELECT * FROM automation_rules WHERE tenant_id = $1 ORDER BY created_at, id", [auth.ctx.tenantId])).rows);
@@ -32,7 +32,7 @@ export const GET = route(async (req) => {
 export const POST = route(async (req) => {
   const blocked = checkOrigin(req);
   if (blocked) return blocked;
-  const auth = await requireTenant(req, "integrations:manage");
+  const auth = await requireTenant(req, "integrations:manage", "automatizaciones");
   if (!auth.ok) return auth.response;
   const body = await readJson(req, createSchema);
   if (!body.ok) return body.response;

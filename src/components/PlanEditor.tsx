@@ -65,7 +65,7 @@ function Row({ plan }: { plan: AdminPlan }) {
         </div>
       </div>
       <fieldset>
-        <legend className="text-sm">Módulos incluidos (se aplican en el próximo paso)</legend>
+        <legend className="text-sm">Módulos incluidos (se aplican al instante; los datos nunca se borran)</legend>
         <div className="mt-2 flex flex-wrap gap-4">
           {PLAN_MODULES.map((m) => (
             <label key={m} className="flex items-center gap-2 text-sm">

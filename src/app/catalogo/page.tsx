@@ -1,3 +1,5 @@
+import { ModuleLocked } from "@/components/ModuleLocked";
+import { tenantHasModule } from "@/lib/plans/modules";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -24,6 +26,7 @@ async function CatalogContent() {
   if (session.needsMfaSetup) redirect("/seguridad");
   const ctx = effectiveTenant(session);
   if (!ctx) redirect("/panel");
+  const locked = !(await tenantHasModule(ctx.tenantId, "catalogo"));
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -36,10 +39,14 @@ async function CatalogContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Catálogo</h1>
+        {locked ? <ModuleLocked module="catalogo" /> : (
+          <>
         <p className="muted-dark mt-3 max-w-[640px]">Tus productos y precios. El asistente solo hablará de lo que esté aquí y de lo que escribiste en «Información de tu negocio».</p>
         <div className="mt-10">
           <CatalogManager />
         </div>
+                </>
+        )}
       </main>
     </div>
   );

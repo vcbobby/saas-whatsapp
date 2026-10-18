@@ -1,4 +1,5 @@
-import { loadPlan, repliesThisMonth } from "@/lib/plans/usage";
+import { planModulesOf } from "@/lib/plans/modules";
+import { loadPlan, repliesThisMonth, type PlanModule } from "@/lib/plans/usage";
 import { getLlmProvider } from "@/lib/ai";
 import type { LlmProvider } from "@/lib/ai/provider";
 import { decryptSecret } from "@/lib/crypto";
@@ -39,6 +40,9 @@ export interface AgentDeps {
   /** Para pruebas: el generador de vectores de la base de conocimiento. */
   embedder: Embedder;
 }
+
+/** Señal interna: el plan no incluye el módulo (no es un error). */
+class PlanSkip extends Error {}
 
 const LOCK_TTL_MS = 90_000; // mayor que IA (30 s) + envío (10 s) + base de datos
 const LLM_MAX_TOKENS = 400;
@@ -273,20 +277,29 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
     } catch (err) {
       console.error("[agente] base de conocimiento no disponible:", err instanceof Error ? err.message : err);
     }
+    // Módulos del plan: sin «agenda» el asistente no ofrece ni crea citas; sin «catalogo», no ofrece ni toma pedidos.
+    // Si no se puede saber, se asume que no hay ninguno (cerrado por defecto).
+    let planMods: PlanModule[] = [];
+    try {
+      planMods = await planModulesOf(tenantId);
+    } catch (err) {
+      console.error("[agente] no se pudo leer el plan:", err instanceof Error ? err.message : err);
+    }
     // Agenda: si el negocio tiene servicios, el asistente recibe un menú cerrado de servicios y horarios libres.
     let menu: AgendaMenu | null = null;
     try {
-      menu = await withTenant(tenantId, (db) => buildMenu(db, tenantId, ctx.contactId));
+      if (planMods.includes("agenda")) menu = await withTenant(tenantId, (db) => buildMenu(db, tenantId, ctx.contactId));
     } catch (err) {
       console.error("[agente] agenda no disponible:", err instanceof Error ? err.message : err);
     }
     // Catálogo: si el negocio tiene productos activos, el asistente recibe una lista cerrada con precios y disponibilidad.
     let catalog: CatalogMenu | null = null;
     try {
+      if (!planMods.includes("catalogo")) throw new PlanSkip();
       const hints = history.filter((h) => h.direction === "in" && h.msg_type === "text" && h.body).slice(-3).map((h) => h.body as string);
       catalog = await withTenant(tenantId, (db) => buildCatalogMenu(db, tenantId, ctx.contactId, hints));
     } catch (err) {
-      console.error("[agente] catálogo no disponible:", err instanceof Error ? err.message : err);
+      if (!(err instanceof PlanSkip)) console.error("[agente] catálogo no disponible:", err instanceof Error ? err.message : err);
     }
     const canary = newCanary();
     const out = await llm.generate({

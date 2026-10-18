@@ -1,3 +1,5 @@
+import { ModuleLocked } from "@/components/ModuleLocked";
+import { tenantHasModule } from "@/lib/plans/modules";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -24,6 +26,7 @@ async function AgendaContent() {
   if (session.needsMfaSetup) redirect("/seguridad");
   const ctx = effectiveTenant(session);
   if (!ctx) redirect("/panel");
+  const locked = !(await tenantHasModule(ctx.tenantId, "agenda"));
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -36,9 +39,13 @@ async function AgendaContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Agenda</h1>
+        {locked ? <ModuleLocked module="agenda" /> : (
+          <>
         <div className="mt-8">
           <AgendaDay />
         </div>
+                </>
+        )}
       </main>
     </div>
   );

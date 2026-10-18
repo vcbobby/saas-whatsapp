@@ -1,3 +1,5 @@
+import { ModuleLocked } from "@/components/ModuleLocked";
+import { tenantHasModule } from "@/lib/plans/modules";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -25,6 +27,7 @@ async function ConfigContent() {
   if (session.needsMfaSetup) redirect("/seguridad");
   const ctx = effectiveTenant(session);
   if (!ctx) redirect("/panel");
+  const locked = !(await tenantHasModule(ctx.tenantId, "agenda"));
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -37,11 +40,15 @@ async function ConfigContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Configurar agenda</h1>
+        {locked ? <ModuleLocked module="agenda" /> : (
+          <>
         <p className="muted-dark mt-3 max-w-[640px]">Define tus servicios y horarios. Las citas se agendarán solo en los huecos libres.</p>
         <p className="mt-3"><Link href="/agenda" className="link">← Volver a las citas</Link></p>
         <div className="mt-10">
           <AgendaConfig />
         </div>
+                </>
+        )}
       </main>
     </div>
   );
