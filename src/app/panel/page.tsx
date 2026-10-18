@@ -1,3 +1,4 @@
+import { SubscriptionNotice } from "@/components/SubscriptionNotice";
 import { PlanCard } from "@/components/PlanCard";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -101,6 +102,8 @@ async function PanelContent() {
                 Esta cuenta está suspendida. Escríbenos para reactivarla.
               </p>
             )}
+
+            <SubscriptionNotice tenantId={ctx.tenantId} canPay={can(ctx.role, "billing:manage") && !ctx.impersonating} />
 
             <PlanCard />
 

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { SubscriptionNotice } from "@/components/SubscriptionNotice";
 import { DaySummary } from "@/components/DaySummary";
 import { WorkQueue } from "@/components/WorkQueue";
 import { can } from "@/lib/auth/permissions";
@@ -38,6 +39,7 @@ async function TodayContent() {
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Hoy</h1>
         <p className="muted-dark mt-3 max-w-[640px]">Lo que necesita a una persona, ordenado por urgencia. Se actualiza solo.</p>
+        <SubscriptionNotice tenantId={ctx.tenantId} canPay={can(ctx.role, "billing:manage") && !ctx.impersonating} />
         <div className="mt-8">
           <DaySummary />
         </div>
