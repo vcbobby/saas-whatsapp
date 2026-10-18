@@ -15,7 +15,7 @@ export const createSchema = z.object({
 
 /** Conexiones del negocio y su registro de envíos recientes. Nunca devuelve secretos. */
 export const GET = route(async (req) => {
-  const auth = await requireTenant(req, "integrations:manage");
+  const auth = await requireTenant(req, "integrations:manage", "automatizaciones");
   if (!auth.ok) return auth.response;
   const { tenantId } = auth.ctx;
   const data = await withTenant(tenantId, async (db) => {
@@ -43,7 +43,7 @@ export const GET = route(async (req) => {
 export const POST = route(async (req) => {
   const blocked = checkOrigin(req);
   if (blocked) return blocked;
-  const auth = await requireTenant(req, "integrations:manage");
+  const auth = await requireTenant(req, "integrations:manage", "automatizaciones");
   if (!auth.ok) return auth.response;
   const body = await readJson(req, createSchema);
   if (!body.ok) return body.response;

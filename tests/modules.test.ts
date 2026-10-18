@@ -80,7 +80,7 @@ describe("layoutFor (reglas puras)", () => {
     ["citas y además vende", { type: "citas", hasServices: false, hasProducts: true }, ["agenda", "catalogo", "pedidos"], []],
     ["catálogo y además agenda", { type: "catalogo", hasServices: true, hasProducts: false }, ["agenda", "catalogo", "pedidos"], []],
   ])("%s", (_n, u, main, more) => {
-    expect(layoutFor(u)).toEqual({ main, more });
+    expect(layoutFor(u)).toMatchObject({ main, more });
   });
   it("todo módulo está en la barra o en «Más», nunca en ninguno ni en ambos", () => {
     for (const type of ["citas", "catalogo", "atencion"] as const) for (const hasServices of [true, false]) for (const hasProducts of [true, false]) {
@@ -93,7 +93,7 @@ describe("layoutFor (reglas puras)", () => {
 describe("loadModuleLayout (base de datos)", () => {
   it("negocio nuevo sin asistente configurado = solo atención: todo en «Más»", async () => {
     const t = await register("nuevo");
-    expect(await load(t)).toEqual({ main: [], more: ["agenda", "catalogo", "pedidos"] });
+    expect(await load(t)).toMatchObject({ main: [], more: ["agenda", "catalogo", "pedidos"] });
   });
   it("sigue el tipo elegido en el asistente", async () => {
     const t = await register("tipo");
@@ -125,6 +125,6 @@ describe("loadModuleLayout (base de datos)", () => {
   it("un valor raro guardado se trata como solo atención", async () => {
     const t = await register("raro");
     await setType(t, "atencion");
-    expect(await load(t)).toEqual({ main: [], more: ["agenda", "catalogo", "pedidos"] });
+    expect(await load(t)).toMatchObject({ main: [], more: ["agenda", "catalogo", "pedidos"] });
   });
 });

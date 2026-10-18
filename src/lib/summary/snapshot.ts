@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { loadSettings } from "@/lib/agenda/load";
 import { addDays, localDate, localToUtc } from "@/lib/agenda/tz";
+import { loadPlan } from "@/lib/plans/usage";
 import { isCurrency, type Currency } from "@/lib/catalog/money";
 
 type Db = Pick<PoolClient, "query">;
@@ -84,10 +85,13 @@ export async function buildSnapshot(db: Db, tenantId: string, now: Date = new Da
   let openTasks = 0, urgentTasks = 0, overdueTasks = 0;
   for (const r of tasks.rows) { byType[r.type as string] = r.n; openTasks += r.n; urgentTasks += r.urgent; overdueTasks += r.overdue; }
 
+  // Solo se resume lo que el plan incluye.
+  const mods = (await loadPlan(db, tenantId))?.modules ?? [];
+
   // Agenda: solo si el negocio tiene algún servicio activo.
   let agenda: Snapshot["agenda"] = null;
   const svc = await db.query("SELECT 1 FROM agenda_services WHERE tenant_id = $1 AND active LIMIT 1", [tenantId]);
-  if (svc.rowCount) {
+  if (svc.rowCount && mods.includes("agenda")) {
     const list = await db.query(
       `SELECT a.starts_at, a.customer_name, a.status, s.name AS service
          FROM appointments a JOIN agenda_services s ON s.tenant_id = a.tenant_id AND s.id = a.service_id
@@ -113,7 +117,7 @@ export async function buildSnapshot(db: Db, tenantId: string, now: Date = new Da
   // Pedidos y stock: solo si el negocio tiene algún producto activo.
   let orders: Snapshot["orders"] = null;
   const prod = await db.query("SELECT 1 FROM catalog_products WHERE tenant_id = $1 AND active LIMIT 1", [tenantId]);
-  if (prod.rowCount) {
+  if (prod.rowCount && mods.includes("catalogo")) {
     const pend = await db.query(
       "SELECT currency, count(*)::int AS n, COALESCE(sum(total_minor), 0)::text AS total, count(*) FILTER (WHERE created_at < $2)::int AS old FROM orders WHERE tenant_id = $1 AND status = 'pendiente' GROUP BY currency ORDER BY currency",
       [tenantId, new Date(now.getTime() - 86_400_000)],

@@ -14,7 +14,7 @@ const schema = z.discriminatedUnion("action", [
 export const POST = route(async (req) => {
   const blocked = checkOrigin(req);
   if (blocked) return blocked;
-  const auth = await requireTenant(req, "integrations:manage");
+  const auth = await requireTenant(req, "integrations:manage", "automatizaciones");
   if (!auth.ok) return auth.response;
   const body = await readJson(req, schema);
   if (!body.ok) return body.response;

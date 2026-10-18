@@ -103,17 +103,19 @@ describe("quotaState", () => {
 });
 
 describe("planes iniciales", () => {
-  it("existen tres planes provisionales y uno solo es el de por defecto", async () => {
-    const r = await getPool().query("SELECT slug, name, is_default, active, max_replies_month, max_members, modules FROM plans WHERE slug LIKE 'plan-%' ORDER BY position");
-    expect(r.rows.map((p) => p.slug)).toEqual(["plan-1", "plan-2", "plan-3"]);
-    expect(r.rows.map((p) => p.is_default)).toEqual([true, false, false]);
+  it("existen la prueba gratis (por defecto, con todos los módulos) y tres planes de pago provisionales", async () => {
+    const r = await getPool().query("SELECT slug, name, is_default, active, max_replies_month, max_members, modules FROM plans WHERE slug IN ('prueba','plan-1','plan-2','plan-3') ORDER BY position");
+    expect(r.rows.map((p) => p.slug)).toEqual(["prueba", "plan-1", "plan-2", "plan-3"]);
+    expect(r.rows.map((p) => p.is_default)).toEqual([true, false, false, false]);
+    expect([...r.rows[0].modules].sort()).toEqual(["agenda", "automatizaciones", "catalogo", "copiloto"]);
     const d = await getPool().query("SELECT count(*)::int AS n FROM plans WHERE is_default");
     expect(d.rows[0].n).toBe(1);
   });
   it("un negocio nuevo recibe el plan por defecto", async () => {
     const t = await register("nuevo");
     const plan = await withTenant(t.tenantId, (db) => loadPlan(db, t.tenantId));
-    expect(plan).toMatchObject({ slug: "plan-1", maxMembers: 3 });
+    expect(plan).toMatchObject({ slug: "prueba", maxMembers: 3 });
+    expect(plan!.modules.length).toBe(4);
   });
   it("la aplicación no puede crear, cambiar ni borrar planes", async () => {
     await expect(getPool().query("INSERT INTO plans (slug, name, max_members) VALUES ('hack', 'x', 1)")).rejects.toThrow(/permission denied/);

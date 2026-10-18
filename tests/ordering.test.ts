@@ -178,7 +178,41 @@ describe("marca de pedido: lectura y limpieza", () => {
   });
 });
 
+/** Cambia el plan del negocio a uno con estos módulos mientras corre fn (en producción solo lo hace el súper admin). */
+async function withPlanModules<R>(tenantId: string, modules: string[], fn: () => Promise<R>): Promise<R> {
+  const slug = `pm-${RUN}-${randomUUID().slice(0, 6)}`;
+  const p = await owner.query<{ id: string }>("INSERT INTO plans (slug, name, position, max_replies_month, max_members, modules) VALUES ($1,$1,99,NULL,5,$2) RETURNING id", [slug, modules]);
+  const assign = async (planId: string) => {
+    const c = await owner.connect();
+    try {
+      await c.query("BEGIN");
+      await c.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+      await c.query("ALTER TABLE tenants DISABLE TRIGGER tenants_plan_guard");
+      await c.query("UPDATE tenants SET plan_id = $2 WHERE id = $1", [tenantId, planId]);
+      await c.query("ALTER TABLE tenants ENABLE TRIGGER tenants_plan_guard");
+      await c.query("COMMIT");
+    } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
+  };
+  const prev = await withTenant(tenantId, async (db) => (await db.query("SELECT plan_id FROM tenants WHERE id = $1", [tenantId])).rows[0].plan_id as string);
+  await assign(p.rows[0]!.id);
+  try { return await fn(); } finally { await assign(prev); await owner.query("DELETE FROM plans WHERE id = $1", [p.rows[0]!.id]); }
+}
+
 describe("menú del catálogo", () => {
+  it("si el plan no incluye catálogo, el asistente no recibe el menú aunque haya productos", async () => {
+    const t = await register("plansin");
+    await withCatalog(t);
+    const sys = async (mods: string[]) => withPlanModules(t.tenantId, mods, async () => {
+      const d = deps();
+      await runAgent(job(t, await inbound(t, newWaId(), "quiero arroz")), d.raw);
+      return systemOf(d);
+    });
+    const sin = await sys(["agenda"]);
+    expect(sin).not.toContain("CATÁLOGO DEL NEGOCIO");
+    expect(sin).not.toContain("[[PEDIDO");
+    expect(await sys(["catalogo"])).toContain("CATÁLOGO DEL NEGOCIO");
+  });
+
   it("sin productos activos no hay menú y el asistente actúa como siempre", async () => {
     const t = await register("nocat");
     const m = await inbound(t, newWaId(), "hola");
