@@ -1,29 +1,27 @@
-import Link from "next/link";
 import { brand } from "@/config/brand";
 import { headers } from "next/headers";
+import { can } from "@/lib/auth/permissions";
 import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
 import { withTenant } from "@/lib/db";
-import { loadModuleLayout, type ModuleLayout, type OptionalModule } from "@/lib/modules";
+import { loadModuleLayout, type ModuleLayout } from "@/lib/modules";
+import { buildNav } from "@/lib/nav";
 import { LogoutButton } from "./LogoutButton";
+import { Sidebar } from "./Sidebar";
 
-const MODULE_LINK: Record<OptionalModule, { href: string; label: string }> = {
-  agenda: { href: "/agenda", label: "Agenda" },
-  catalogo: { href: "/catalogo", label: "Catálogo" },
-  pedidos: { href: "/pedidos", label: "Pedidos" },
-};
 const ALL_MAIN: ModuleLayout = { main: ["agenda", "catalogo", "pedidos"], more: [], team: { copiloto: true, automatizaciones: true } };
 
-async function layoutForSession(): Promise<ModuleLayout> {
+async function layoutForSession(): Promise<{ layout: ModuleLayout; canPay: boolean; hasTenant: boolean }> {
   // headers() va FUERA del try: es una señal interna de Next y atraparla rompe la renderización.
   const h = await headers();
   try {
     const auth = await getSessionFromHeaders(h);
     const ctx = auth ? effectiveTenant(auth.session) : null;
-    if (!ctx) return ALL_MAIN;
-    return await withTenant(ctx.tenantId, (db) => loadModuleLayout(db, ctx.tenantId));
+    if (!ctx) return { layout: ALL_MAIN, canPay: false, hasTenant: false };
+    const layout = await withTenant(ctx.tenantId, (db) => loadModuleLayout(db, ctx.tenantId));
+    return { layout, canPay: can(ctx.role, "billing:manage") && !ctx.impersonating, hasTenant: true };
   } catch (e) {
     console.error("[menu] no se pudo calcular los módulos; se muestran todos:", e instanceof Error ? e.message : e);
-    return ALL_MAIN; // ante cualquier duda se muestra todo: nunca se esconde un módulo por un error
+    return { layout: ALL_MAIN, canPay: false, hasTenant: true }; // ante cualquier duda se muestra todo: nunca se esconde un módulo por un error
   }
 }
 
@@ -33,6 +31,7 @@ export const ROLE_LABEL: Record<string, string> = {
   agent: "Agente",
 };
 
+/** Menú lateral de la app (en celular, barra superior con cajón). Las páginas lo usan igual que antes. */
 export async function AppHeader({
   email,
   roleLabel,
@@ -44,84 +43,24 @@ export async function AppHeader({
   roleLabel?: string;
   showAdmin?: boolean;
   showTeam?: boolean;
-  /** Enlaces «Hoy» y «Conversaciones». Se ocultan donde no hay negocio (p. ej. administración). */
+  /** Hay un negocio detrás de esta pantalla. Se oculta en administración. */
   showWork?: boolean;
 }) {
-  const modules = showWork ? await layoutForSession() : ALL_MAIN;
+  const { layout, canPay, hasTenant } = showWork ? await layoutForSession() : { layout: ALL_MAIN, canPay: false, hasTenant: false };
+  const groups = buildNav({ hasTenant, canManage: !!showTeam, canPay, isSuperAdmin: !!showAdmin, layout });
   return (
-    <header className="container-app flex min-h-20 flex-wrap items-center justify-between gap-4 py-4">
-      <Link href="/panel" className="text-lg font-medium" style={{ letterSpacing: "-0.01em" }}>
-        {brand.name}
-      </Link>
-      <div className="flex flex-wrap items-center gap-3">
-        {showWork && (
-          <>
-            <Link href="/hoy" className="btn btn-text btn-sm">
-              Hoy
-            </Link>
-            <Link href="/conversaciones" className="btn btn-text btn-sm">
-              Conversaciones
-            </Link>
-            {modules.main.map((m) => (
-              <Link key={m} href={MODULE_LINK[m].href} className="btn btn-text btn-sm">
-                {MODULE_LINK[m].label}
-              </Link>
-            ))}
-            {modules.more.length > 0 && (
-              <details className="relative">
-                <summary className="btn btn-text btn-sm cursor-pointer list-none">Más</summary>
-                <div className="absolute right-0 z-10 mt-1 flex min-w-[160px] flex-col gap-1 rounded-[16px] p-2" style={{ background: "var(--color-deep-abyss)", border: "1px solid var(--color-field-border)" }}>
-                  {modules.more.map((m) => (
-                    <Link key={m} href={MODULE_LINK[m].href} className="btn btn-text btn-sm justify-start">
-                      {MODULE_LINK[m].label}
-                    </Link>
-                  ))}
-                </div>
-              </details>
-            )}
-          </>
-        )}
-        {showAdmin && (
-          <Link href="/admin" className="btn btn-text btn-sm">
-            Administración
-          </Link>
-        )}
-        {showTeam && (
-          // Quien puede gestionar el equipo (dueño y administrador) también gestiona el asistente.
-          <>
-            {modules.team.copiloto && (
-              <Link href="/copiloto" className="btn btn-text btn-sm">
-              Copiloto
-            </Link>
-            )}
-            <Link href="/agente" className="btn btn-text btn-sm">
-              Asistente
-            </Link>
-            {modules.team.automatizaciones && (
-              <Link href="/automatizaciones" className="btn btn-text btn-sm">
-              Automatizaciones
-            </Link>
-            )}
-            {modules.team.automatizaciones && (
-              <Link href="/conexiones" className="btn btn-text btn-sm">
-              Conexiones
-            </Link>
-            )}
-            <Link href="/conocimiento" className="btn btn-text btn-sm">
-              Conocimiento
-            </Link>
-            <Link href="/equipo" className="btn btn-text btn-sm">
-              Equipo
-            </Link>
-          </>
-        )}
-        <Link href="/seguridad" className="btn btn-text btn-sm">
-          Seguridad
-        </Link>
-        <span className="muted-dark text-sm">{email}</span>
-        {roleLabel && <span className="badge badge-neutral">{roleLabel}</span>}
-        <LogoutButton />
-      </div>
-    </header>
+    <Sidebar
+      brandName={brand.name}
+      groups={groups}
+      footer={
+        <>
+          <p className="app-user" title={email}>{email}</p>
+          <div className="app-footer-row">
+            {roleLabel && <span className="badge badge-neutral">{roleLabel}</span>}
+            <LogoutButton />
+          </div>
+        </>
+      }
+    />
   );
 }
