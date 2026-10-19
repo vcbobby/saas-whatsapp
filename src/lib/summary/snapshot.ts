@@ -39,7 +39,7 @@ export interface Snapshot {
 
 const clean = (s: unknown, max: number) => String(s ?? "").replace(/[\u0000-\u001f\u007f<>]|\[\[|\]\]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
-function dayRange(ymd: string, tz: string): [Date, Date] {
+export function dayRange(ymd: string, tz: string): [Date, Date] {
   const a = localToUtc(ymd, 0, tz);
   const b = localToUtc(addDays(ymd, 1), 0, tz);
   // Si el salto de horario hiciera inexistente la medianoche, se usa la hora de ese día más cercana.
