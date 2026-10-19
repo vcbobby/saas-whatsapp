@@ -177,6 +177,40 @@ h1, h2, h3 {
   .container-app { padding-left: 16px; padding-right: 16px; }
 }
 
+/* ---------- menú lateral (escritorio) y cajón (celular) ---------- */
+.app-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: var(--color-deep-abyss); border-bottom: 1px solid rgba(255, 255, 255, 0.08); position: sticky; top: 0; z-index: 30; }
+.app-brand { font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.app-brand--side { display: none; padding: 4px 12px 20px; }
+.app-scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.55); border: 0; }
+.app-sidebar { position: fixed; z-index: 50; top: 0; bottom: 0; left: 0; width: min(310px, 86vw); background: var(--color-deep-abyss); border-right: 1px solid rgba(255, 255, 255, 0.08); padding: 20px 12px 12px; display: flex; flex-direction: column; transform: translateX(-102%); transition: transform 0.18s ease-out; overflow: hidden; }
+.app-sidebar[data-open="true"] { transform: none; }
+.app-nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding-bottom: 12px; }
+.app-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.app-group-title { font-size: 13px; color: var(--color-mint-whisper); padding: 0 12px 6px; opacity: 0.85; }
+.app-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 12px; color: rgba(255, 255, 255, 0.86); position: relative; min-height: 48px; }
+.app-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.app-item[aria-current="page"] { background: rgba(61, 220, 145, 0.14); color: #fff; }
+.app-item[aria-current="page"]::before { content: ""; position: absolute; left: -12px; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: var(--color-neon-pulse); }
+.app-item[aria-current="page"] .side-icon { color: var(--color-neon-pulse); }
+.side-icon { flex: none; opacity: 0.95; }
+.app-item-text { display: flex; flex-direction: column; min-width: 0; }
+.app-item-label { font-size: 15px; font-weight: 500; line-height: 1.25; }
+.app-item-hint { font-size: 12.5px; line-height: 1.3; color: rgba(255, 255, 255, 0.62); }
+.app-item[aria-current="page"] .app-item-hint { color: rgba(255, 255, 255, 0.78); }
+.app-footer { border-top: 1px solid rgba(255, 255, 255, 0.1); padding: 10px 8px 2px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.app-footer-row { display: flex; align-items: center; gap: 8px; }
+.app-footer-row .btn { min-height: 36px; padding: 4px 16px; }
+.app-user { font-size: 13px; color: rgba(255, 255, 255, 0.75); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-sidebar :focus-visible, .app-topbar :focus-visible { outline: 2px solid var(--color-neon-pulse); outline-offset: 2px; }
+
+@media (min-width: 1024px) {
+  .app-topbar, .app-scrim { display: none; }
+  .app-sidebar { transform: none; width: 272px; transition: none; }
+  .app-brand--side { display: block; }
+  /* El contenido de todas las páginas se corre a la derecha del menú (sin tocar cada página). */
+  body:has(.app-sidebar) { padding-left: 272px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
