@@ -17,6 +17,7 @@ export async function buildDashboard(db: Db, tenantId: string, now: Date = new D
   const [start] = dayRange(first, tz);
   const [, end] = dayRange(today, tz);
   const mods = (await loadPlan(db, tenantId))?.modules ?? [];
+  const ob = String((await db.query("SELECT onboarding_state FROM tenants WHERE id = $1", [tenantId])).rows[0]?.onboarding_state ?? "done");
 
   const rows = new Map<string, Partial<Omit<DayPoint, "day">>>();
   const put = (day: string, patch: Partial<Omit<DayPoint, "day">>) => rows.set(day, { ...(rows.get(day) ?? {}), ...patch });
@@ -87,5 +88,6 @@ export async function buildDashboard(db: Db, tenantId: string, now: Date = new D
     days,
     week: { inbound: delta("inbound"), outbound: delta("outbound"), people: { current: ppl.rows[0].cur, previous: ppl.rows[0].prev }, appointments: delta("appointments"), orders: delta("orders"), sales },
     checklist,
+    onboarding: ob === "pending" || ob === "skipped" ? ob : "done",
   };
 }
