@@ -38,14 +38,17 @@ async function PanelContent() {
 
   const tenant = ctx
     ? await withTenant(ctx.tenantId, async (db) => {
-        const r = await db.query<{ name: string; status: string; days_left: number | null }>(
-          `SELECT name, status,
+        const r = await db.query<{ name: string; status: string; onboarding_state: string; days_left: number | null }>(
+          `SELECT name, status, onboarding_state,
                   GREATEST(0, CEIL(EXTRACT(EPOCH FROM (trial_ends_at - now())) / 86400))::int AS days_left
            FROM tenants`,
         );
         return r.rows[0] ?? null;
       })
     : null;
+
+  // Negocio nuevo: primero el asistente de bienvenida (quien solo atiende chats no lo ve).
+  if (ctx && !ctx.impersonating && tenant?.onboarding_state === "pending" && can(ctx.role, "agent:manage")) redirect("/bienvenida");
 
   const daysLeft = tenant?.status === "trial" ? tenant.days_left : null;
 

@@ -112,6 +112,9 @@ export function Dashboard() {
 
   return (
     <div className="mt-8 grid gap-6">
+      {d.onboarding === "skipped" && (
+        <p className="card-dark" role="note">¿Prefieres que te guiemos? <Link href="/bienvenida" className="link">Abrir el asistente de bienvenida</Link> y dejamos tu cuenta lista en 5 pasos.</p>
+      )}
       <Attention s={s} />
       <Checklist d={d} />
 

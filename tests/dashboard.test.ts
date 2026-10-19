@@ -141,6 +141,9 @@ describe("cálculo del panel", () => {
     expect(d.checklist.filter((c) => c.done)).toEqual([]);
     expect(d.week.sales).toEqual([]);
     expect(d.week.people).toEqual({ current: 0, previous: 0 });
+    expect(d.onboarding).toBe("pending");
+    await withTenant(t.tenantId, (db) => db.query("UPDATE tenants SET onboarding_state = 'skipped' WHERE id = $1", [t.tenantId]));
+    expect((await dash(t)).onboarding).toBe("skipped");
   });
 
   it("los mensajes caen en el día del negocio (medianoche local, no UTC) y se comparan semanas", async () => {

@@ -338,7 +338,9 @@ describe("envío del aviso (worker)", () => {
   it("negocio suspendido: no se envía", async () => {
     const t = await register("s-susp");
     const { n } = await pendingNote(t);
-    await withTenant(t.tenantId, (db) => db.query("UPDATE tenants SET status = 'suspended' WHERE id = $1", [t.tenantId]));
+    // Como lo haría el súper admin o el cobro: la aplicación ya no puede cambiar el estado de la cuenta por su cuenta.
+    const c = await owner.connect();
+    try { await c.query("SELECT set_config('app.tenant_id', $1, false)", [t.tenantId]); await c.query("UPDATE tenants SET status = 'suspended' WHERE id = $1", [t.tenantId]); await c.query("SELECT set_config('app.tenant_id', '', false)"); } finally { c.release(); }
     expect(await sendOne(t.tenantId, n.id, { send: okSend() })).toBe("omitted");
     expect((await notes(t))[0].reason).toBe("negocio_inactivo");
   });

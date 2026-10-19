@@ -19,6 +19,8 @@ export interface DashboardData {
   /** Últimos 7 días contra los 7 anteriores. */
   week: { inbound: Delta; outbound: Delta; people: Delta; appointments: Delta; orders: Delta; sales: MoneyTotal[] };
   checklist: ChecklistItem[];
+  /** Estado del asistente de bienvenida (si lo saltó, Inicio le ofrece retomarlo). */
+  onboarding: "pending" | "done" | "skipped";
 }
 
 /** Rellena con ceros los días sin datos y deja la lista ordenada del más antiguo a hoy. Pura: se prueba sola. */
