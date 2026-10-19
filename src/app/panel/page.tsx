@@ -1,5 +1,6 @@
 import { SubscriptionNotice } from "@/components/SubscriptionNotice";
 import { PlanCard } from "@/components/PlanCard";
+import { Dashboard } from "@/components/Dashboard";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -105,31 +106,9 @@ async function PanelContent() {
 
             <SubscriptionNotice tenantId={ctx.tenantId} canPay={can(ctx.role, "billing:manage") && !ctx.impersonating} />
 
-            <PlanCard />
+            <Dashboard />
 
-            <section className="mt-12 grid gap-6 md:grid-cols-3" aria-label="Próximos pasos">
-              <article className="card-dark">
-                <p className="eyebrow eyebrow--dark">Paso 1</p>
-                <h2 className="mt-2 text-xl">Conecta tu WhatsApp</h2>
-                <p className="muted-dark mt-2 text-sm">
-                  <Link href="/whatsapp" className="link">Conectar mi número</Link>
-                </p>
-              </article>
-              <article className="card-dark">
-                <p className="eyebrow eyebrow--dark">Paso 2</p>
-                <h2 className="mt-2 text-xl">Cuéntale a tu agente cómo atiendes</h2>
-                <p className="muted-dark mt-2 text-sm">
-                  Horarios, servicios y preguntas frecuentes. <Link href="/agente" className="link">Configurar el asistente</Link>
-                </p>
-              </article>
-              <article className="card-dark">
-                <p className="eyebrow eyebrow--dark">Paso 3</p>
-                <h2 className="mt-2 text-xl">Invita a tu equipo</h2>
-                <p className="muted-dark mt-2 text-sm">
-                  {can(ctx.role, "team:manage") ? "Podrás añadir agentes y administradores." : "Solo administradores y dueños pueden invitar personas."}
-                </p>
-              </article>
-            </section>
+            <PlanCard />
           </>
         )}
       </main>
