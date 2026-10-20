@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ACCEPT, ExtractError, extractText } from "@/lib/kb/extract";
+import { EmptyState } from "@/components/EmptyState";
 
 interface Doc {
   id: string;
@@ -169,7 +170,7 @@ export function KnowledgeBase({ canManage, fakeEmbeddings }: { canManage: boolea
         {docs === null ? (
           <p className="muted" role="status">Cargando…</p>
         ) : docs.length === 0 ? (
-          <p className="muted">Aún no hay documentos.</p>
+          <EmptyState title="Enséñale a tu asistente" text="Añade un documento corto por tema: horarios y ubicación, lista de precios, formas de pago, políticas de cambios o garantía. Así responde con tus datos y no inventa." actions={[]} help="conocimiento" />
         ) : (
           <ul className="flex flex-col gap-3" style={{ listStyle: "none", padding: 0 }}>
             {docs.map((d) => (

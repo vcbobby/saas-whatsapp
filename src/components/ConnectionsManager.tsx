@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { postJson } from "@/lib/client";
 import { WEBHOOK_EVENTS, WEBHOOK_EVENT_LABEL, type WebhookEvent } from "@/lib/webhooks/events";
+import { EmptyState } from "@/components/EmptyState";
 
 interface Endpoint { id: string; url: string; description: string | null; events: string[]; active: boolean; consecutiveFailures: number; disabledReason: string | null; createdAt: string; pending: number }
 interface Delivery { id: string; endpointId: string; eventType: string; status: "pendiente" | "entregado" | "fallido"; attempts: number; lastStatus: number | null; lastError: string | null; createdAt: string; finishedAt: string | null }
@@ -116,7 +117,7 @@ export function ConnectionsManager() {
       <div aria-live="assertive" role="alert">{error && <p className="alert-error">{error}</p>}</div>
       <div aria-live="polite" role="status">{notice && <p className="muted-dark">{notice}</p>}</div>
 
-      {data.endpoints.length === 0 && !creating && <p className="muted-dark">Todavía no tienes conexiones.</p>}
+      {data.endpoints.length === 0 && !creating && <EmptyState tone="dark" title="Todavía no tienes conexiones" text="Una conexión avisa a otra aplicación cuando pasa algo en tu negocio. Es opcional: si no usas otras herramientas, puedes ignorar esta pantalla." help="conexiones" />}
 
       {data.endpoints.map((ep) => {
         const mine = data.deliveries.filter((d) => d.endpointId === ep.id).slice(0, 8);

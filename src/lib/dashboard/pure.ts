@@ -46,12 +46,12 @@ export function pctChange(d: Delta): number | null {
   return Math.round(((d.current - d.previous) / d.previous) * 100);
 }
 
-export function buildChecklist(f: { whatsapp: boolean; agent: boolean; kb: boolean; catalog: boolean; team: boolean; message: boolean }): ChecklistItem[] {
+export function buildChecklist(f: { whatsapp: boolean; agent: boolean; kb: boolean; catalog: boolean; team: boolean; message: boolean; sells?: boolean }): ChecklistItem[] {
   return [
     { key: "whatsapp", label: "Conecta tu WhatsApp", hint: "Sin esto el asistente no puede recibir mensajes.", href: "/whatsapp", done: f.whatsapp },
     { key: "agente", label: "Activa y configura tu asistente", hint: "Dile su nombre y cómo atiendes.", href: "/agente", done: f.agent },
     { key: "conocimiento", label: "Enséñale con tus preguntas frecuentes", hint: "Horarios, precios, ubicación, políticas.", href: "/conocimiento", done: f.kb },
-    { key: "catalogo", label: "Carga tus servicios o productos", hint: "Para que el asistente pueda agendar o tomar pedidos.", href: "/agenda", done: f.catalog },
+    { key: "catalogo", label: "Carga tus servicios o productos", hint: "Para que el asistente pueda agendar o tomar pedidos.", href: f.sells ? "/catalogo" : "/agenda", done: f.catalog },
     { key: "equipo", label: "Invita a tu equipo", hint: "Para que más personas atiendan a los clientes.", href: "/equipo", done: f.team },
     { key: "mensaje", label: "Recibe tu primer mensaje", hint: "Prueba escribiéndole a tu número desde otro teléfono.", href: "/conversaciones", done: f.message },
   ];

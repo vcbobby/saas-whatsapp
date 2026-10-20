@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { topicForPath } from "@/lib/help";
 import { isActive, type NavGroup, type NavIcon } from "@/lib/nav";
 
 const PATHS: Record<NavIcon, string> = {
@@ -20,6 +21,7 @@ const PATHS: Record<NavIcon, string> = {
   bolt: "M13 3L5 13h6l-1 8 8-10h-6z",
   plug: "M9 3v5M15 3v5M6 8h12v3a6 6 0 01-12 0zM12 17v4",
   users: "M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 3-5 6-5s6 2 6 5M17 8a2.5 2.5 0 110 5M17 15c2.5 0 4 1.5 4 4",
+  help: "M12 21a9 9 0 100-18 9 9 0 000 18zM9.6 9.3a2.4 2.4 0 114 1.5c-.8.6-1.6 1-1.6 2.2M12 16.6h.01",
   user: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 3.6-6 8-6s8 2 8 6",
   card: "M3 6h18v12H3zM3 10h18M7 15h3",
   shield: "M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z",
@@ -37,6 +39,7 @@ function Icon({ name }: { name: NavIcon }) {
 /** Menú lateral (escritorio) y cajón (celular). */
 export function Sidebar({ brandName, groups, footer }: { brandName: string; groups: NavGroup[]; footer: ReactNode }) {
   const pathname = usePathname();
+  const help = topicForPath(pathname);
   const navId = useId();
   // El cajón se cierra solo al cambiar de página: se guarda en qué página se abrió.
   const [openAt, setOpenAt] = useState<string | null>(null);
@@ -83,6 +86,11 @@ export function Sidebar({ brandName, groups, footer }: { brandName: string; grou
             </div>
           ))}
         </nav>
+        {help && (
+          <a href={`/ayuda#${help.id}`} style={{ display: "block", margin: "0 8px 10px", padding: "8px 12px", borderRadius: 12, border: "1px dashed rgba(255,255,255,0.28)", fontSize: 13, color: "rgba(255,255,255,0.86)" }}>
+            ¿Cómo funciona «{help.title}»?
+          </a>
+        )}
         <div className="app-footer">{footer}</div>
       </aside>
     </>

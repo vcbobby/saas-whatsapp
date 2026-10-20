@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { formatMoney, type Currency } from "@/lib/catalog/money";
+import { EmptyState } from "@/components/EmptyState";
 
 type Status = "pendiente" | "confirmado" | "entregado" | "cancelado";
 interface Item { name: string; unit: string | null; unitPriceMinor: number; quantity: number; lineTotalMinor: number }
@@ -111,7 +112,7 @@ export function OrdersManager() {
       {!orders ? (
         <p className="muted-dark" role="status">Cargando pedidos…</p>
       ) : orders.length === 0 ? (
-        <div className="card-light" style={{ maxWidth: 820 }}><p className="muted">No hay pedidos en esta lista.</p></div>
+        <EmptyState title="Aún no hay pedidos en esta lista" text="Los pedidos llegan cuando un cliente pide por WhatsApp o cuando tú los creas. Para que el asistente pueda tomarlos, primero carga tus productos con su precio." actions={[{ href: "/catalogo", label: "Cargar productos" }, { href: "/simulador", label: "Probar el asistente" }]} help="pedidos" />
       ) : (
         <ul className="flex flex-col gap-4" style={{ maxWidth: 820 }} aria-label="Pedidos">
           {orders.map((o) => (

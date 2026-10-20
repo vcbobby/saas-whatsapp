@@ -69,12 +69,13 @@ export async function buildDashboard(db: Db, tenantId: string, now: Date = new D
 
   // Lista «Primeros pasos»: se calcula con lo que el negocio ya tiene.
   const q = async (sql: string) => Boolean((await db.query(sql, [tenantId])).rowCount);
-  const agent = await db.query("SELECT enabled FROM tenant_agents WHERE tenant_id = $1", [tenantId]);
+  const agent = await db.query("SELECT enabled, business_type FROM tenant_agents WHERE tenant_id = $1", [tenantId]);
   const members = await db.query("SELECT count(*)::int AS n FROM memberships WHERE tenant_id = $1", [tenantId]);
   const pending = await db.query("SELECT tenant_pending_invitations() AS n");
   const checklist = buildChecklist({
     whatsapp: await q("SELECT 1 FROM tenant_integrations WHERE tenant_id = $1 LIMIT 1"),
     agent: agent.rows[0]?.enabled === true,
+    sells: agent.rows[0]?.business_type === "catalogo",
     kb: await q("SELECT 1 FROM kb_documents WHERE tenant_id = $1 AND status = 'ready' LIMIT 1"),
     catalog: (await q("SELECT 1 FROM agenda_services WHERE tenant_id = $1 AND active LIMIT 1")) || (await q("SELECT 1 FROM catalog_products WHERE tenant_id = $1 AND active LIMIT 1")),
     team: Number(members.rows[0].n) + Number(pending.rows[0].n) > 1,

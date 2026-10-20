@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { postJson } from "@/lib/client";
 import { MESSAGE_TRIGGERS, OFFSET_LABEL, PLACEHOLDERS, STATUS_OPTIONS, TIME_TRIGGERS, TRIGGERS, TRIGGER_LABEL } from "@/lib/automations/rules";
+import { EmptyState } from "@/components/EmptyState";
 
 interface Rule { id: string; name: string; triggerEvent: string; onlyStatus: string | null; actionType: "tarea" | "mensaje"; messageTemplate: string | null; taskTitle: string; taskPriority: number; taskDueMinutes: number | null; offsetMinutes: number | null; active: boolean; runCount: number; lastRunAt: string | null }
 interface Note { id: string; ruleName: string | null; customerName: string | null; body: string; status: "pendiente" | "enviado" | "omitido" | "fallido"; reason: string | null; attempts: number; createdAt: string }
@@ -67,7 +68,7 @@ export function AutomationsManager() {
       </p>
       <div aria-live="assertive" role="alert">{error && <p className="alert-error">{error}</p>}</div>
 
-      {data.rules.length === 0 && !form && <p className="muted-dark">Todavía no tienes reglas.</p>}
+      {data.rules.length === 0 && !form && <EmptyState tone="dark" title="Todavía no tienes reglas" text="Una regla hace algo por ti cuando ocurre un evento, por ejemplo crear una tarea en Hoy cuando entra un pedido nuevo. Pulsa el botón de crear regla para empezar." help="automatizaciones" />}
       {data.rules.map((r) => (
         <section key={r.id} className="card-light flex flex-col gap-2" style={{ padding: 20 }} aria-label={`Regla ${r.name}`}>
           <div className="flex flex-wrap items-center gap-2">
