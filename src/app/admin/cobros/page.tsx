@@ -1,0 +1,38 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { AdminBilling } from "@/components/AdminBilling";
+import { AppHeader } from "@/components/AppHeader";
+import { requireAdminPage } from "@/lib/admin/page";
+import { getPool } from "@/lib/db";
+
+export const metadata: Metadata = { title: "Cobros" };
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<div className="container-app py-24 muted-dark" role="status">Cargando…</div>}>
+      <Content />
+    </Suspense>
+  );
+}
+
+async function Content() {
+  const auth = await requireAdminPage();
+  const planRows = (await getPool().query("SELECT id, name, price_usd_cents FROM plans ORDER BY position, name")).rows;
+  const st = (await getPool().query("SELECT admin_get_payment_settings($1) AS s", [auth.tokenHash])).rows[0].s as Record<string, string | number | null>;
+  const billing = {
+    rate: st.bcv_rate === null ? null : Number(st.bcv_rate), rateAgeHours: st.rate_age_hours === null || st.rate_age_hours === undefined ? null : Number(st.rate_age_hours),
+    pmBank: String(st.pm_bank ?? ""), pmPhone: String(st.pm_phone ?? ""), pmHolderId: String(st.pm_holder_id ?? ""), pmHolderName: String(st.pm_holder_name ?? ""),
+    paypal: String(st.paypal_email ?? ""), binance: String(st.binance_id ?? ""), notes: String(st.notes ?? ""),
+  };
+  const priced = planRows.map((r) => ({ id: String(r.id), name: String(r.name), priceCents: r.price_usd_cents === null ? null : Number(r.price_usd_cents) }));
+  return (
+    <div className="flex min-h-screen flex-col">
+      <AppHeader email={auth.session.email} roleLabel="Súper admin" showAdmin adminMode />
+      <main className="container-app flex-1 pb-24 pt-8">
+        <p className="eyebrow eyebrow--dark">Solo súper admin</p>
+        <h1 className="mt-3 text-[32px] sm:text-[48px]">Cobros</h1>
+        <AdminBilling settings={billing} plans={priced} />
+      </main>
+    </div>
+  );
+}

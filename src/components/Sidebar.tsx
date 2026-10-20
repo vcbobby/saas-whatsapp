@@ -21,6 +21,9 @@ const PATHS: Record<NavIcon, string> = {
   bolt: "M13 3L5 13h6l-1 8 8-10h-6z",
   plug: "M9 3v5M15 3v5M6 8h12v3a6 6 0 01-12 0zM12 17v4",
   users: "M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 3-5 6-5s6 2 6 5M17 8a2.5 2.5 0 110 5M17 15c2.5 0 4 1.5 4 4",
+  chart: "M4 20V10m6 10V4m6 16v-7m4 7H2",
+  store: "M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9a2.7 2.7 0 005.3 0 2.7 2.7 0 005.4 0A2.7 2.7 0 0020 9M9.5 20v-5h5v5",
+  tag: "M3 12V4h8l10 10-8 8L3 12zm5-4h.01",
   help: "M12 21a9 9 0 100-18 9 9 0 000 18zM9.6 9.3a2.4 2.4 0 114 1.5c-.8.6-1.6 1-1.6 2.2M12 16.6h.01",
   user: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-4 3.6-6 8-6s8 2 8 6",
   card: "M3 6h18v12H3zM3 10h18M7 15h3",
@@ -69,7 +72,7 @@ export function Sidebar({ brandName, groups, footer }: { brandName: string; grou
               {g.title && <p className="app-group-title">{g.title}</p>}
               <ul>
                 {g.items.map((it) => {
-                  const active = isActive(it.href, pathname);
+                  const active = isActive(it.href, pathname, it.exact);
                   return (
                     <li key={it.href}>
                       <Link href={it.href} className="app-item" aria-current={active ? "page" : undefined}>

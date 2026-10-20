@@ -162,6 +162,15 @@ export const HELP_TOPICS: HelpTopic[] = [
     ],
     links: [{ href: "/seguridad", label: "Abrir Seguridad" }],
   },
+  {
+    id: "administracion", title: "Administración", summary: "Para el súper admin: cómo va la plataforma y sus negocios.",
+    steps: [
+      "Resumen: registros de la semana, negocios en prueba y con plan activo, y lo que requiere atención (pagos por revisar, planes por vencer).",
+      "Negocios: cambia el estado o el plan de un negocio y entra como soporte (pide un motivo, dura 30 minutos y queda en el registro).",
+      "Planes: qué incluye cada plan y su precio. Cobros: tasa del dólar, métodos de pago y revisión de comprobantes.",
+    ],
+    links: [{ href: "/admin", label: "Abrir el resumen" }, { href: "/admin/negocios", label: "Ver negocios" }],
+  },
 ];
 
 export const HELP_FAQ: { q: string; a: string }[] = [
@@ -179,7 +188,7 @@ export function topicForPath(pathname: string): HelpTopic | null {
   const map: Record<string, string> = {
     "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
-    "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad",
+    "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion",
   };
   const id = map[seg];
   return id ? (HELP_TOPICS.find((t) => t.id === id) ?? null) : null;
