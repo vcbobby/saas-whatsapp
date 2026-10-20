@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { PasswordForm } from "@/components/PasswordForm";
 import { SecurityPanel } from "@/components/SecurityPanel";
 import { getPool } from "@/lib/db";
 import { can } from "@/lib/auth/permissions";
@@ -39,13 +40,14 @@ async function SeguridadContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu cuenta</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Seguridad</h1>
-        <div className="mt-10">
+        <div className="mt-10 grid gap-8">
           <SecurityPanel
             enabled={row.st_enabled}
             codesLeft={row.st_codes_left}
             isSuperAdmin={isSuper}
             mustEnable={session.needsMfaSetup}
           />
+          {!session.needsMfaSetup && <PasswordForm />}
         </div>
       </main>
     </div>

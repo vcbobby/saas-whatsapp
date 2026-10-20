@@ -12,6 +12,7 @@ export const POLICIES = {
   api: { limit: 600, windowSec: 60 }, // cualquier ruta de la API
   login: { limit: 30, windowSec: 300 }, // /api/auth/login
   mfa: { limit: 30, windowSec: 300 }, // verificar código de 2 pasos
+  password: { limit: 10, windowSec: 600 }, // cambiar la contraseña (pide la actual: frena adivinarla)
   signup: { limit: 10, windowSec: 3600 }, // crear cuentas (cada cuenta nueva puede gastar IA en la prueba)
   invite: { limit: 20, windowSec: 3600 }, // aceptar / crear cuenta con invitación
   badSignature: { limit: 10, windowSec: 60 }, // firmas falsas en el webhook de WhatsApp

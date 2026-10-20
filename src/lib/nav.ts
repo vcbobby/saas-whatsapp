@@ -2,7 +2,7 @@ import type { ModuleLayout, OptionalModule } from "@/lib/modules";
 
 export type NavIcon =
   | "home" | "chat" | "today" | "calendar" | "box" | "receipt" | "bot" | "book" | "flask" | "wand"
-  | "phone" | "bolt" | "plug" | "users" | "card" | "shield" | "gear";
+  | "phone" | "bolt" | "plug" | "users" | "user" | "card" | "shield" | "gear";
 
 export interface NavItem { href: string; label: string; hint: string; icon: NavIcon }
 export interface NavGroup { title: string | null; items: NavItem[] }
@@ -63,6 +63,7 @@ export function buildNav(i: NavInput): NavGroup[] {
     }
   }
   const account: NavItem[] = [];
+  if (i.hasTenant) account.push({ href: "/cuenta", label: "Mi cuenta", hint: "Tu negocio y tu perfil", icon: "user" });
   if (i.hasTenant && i.canManage) account.push({ href: "/equipo", label: "Equipo", hint: "Personas y permisos", icon: "users" });
   if (i.hasTenant && i.canPay) account.push({ href: "/plan", label: "Plan y pagos", hint: "Tu plan y su vencimiento", icon: "card" });
   account.push({ href: "/seguridad", label: "Seguridad", hint: "Contraseña y verificación", icon: "shield" });
