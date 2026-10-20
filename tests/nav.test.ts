@@ -9,7 +9,7 @@ const titles = (i: Partial<NavInput>) => buildNav({ ...base, ...i }).map((g) => 
 describe("menú lateral", () => {
   it("el dueño ve todo, en grupos con nombre", () => {
     expect(titles({})).toEqual([null, "Mi negocio", "Asistente", "Automatizar", "Cuenta"]);
-    expect(hrefs({})).toEqual(["/panel", "/hoy", "/conversaciones", "/agenda", "/catalogo", "/pedidos", "/agente", "/conocimiento", "/simulador", "/copiloto", "/whatsapp", "/automatizaciones", "/conexiones", "/equipo", "/plan", "/seguridad"]);
+    expect(hrefs({})).toEqual(["/panel", "/hoy", "/conversaciones", "/agenda", "/catalogo", "/pedidos", "/agente", "/conocimiento", "/simulador", "/copiloto", "/whatsapp", "/automatizaciones", "/conexiones", "/cuenta", "/equipo", "/plan", "/seguridad"]);
   });
   it("los módulos que el negocio usa van primero; los demás siguen a un clic", () => {
     const h = hrefs({ layout: layoutFor({ type: "catalogo", hasServices: false, hasProducts: true }) });
@@ -22,8 +22,8 @@ describe("menú lateral", () => {
     for (const x of ["/catalogo", "/pedidos", "/copiloto", "/automatizaciones", "/conexiones"]) expect(h).not.toContain(x);
     expect(titles({ layout: l })).not.toContain("Automatizar");
   });
-  it("un agente solo ve su trabajo del día y la seguridad de su cuenta", () => {
-    expect(hrefs({ canManage: false, canPay: false })).toEqual(["/panel", "/hoy", "/conversaciones", "/agenda", "/catalogo", "/pedidos", "/seguridad"]);
+  it("un agente solo ve su trabajo del día, su cuenta y su seguridad", () => {
+    expect(hrefs({ canManage: false, canPay: false })).toEqual(["/panel", "/hoy", "/conversaciones", "/agenda", "/catalogo", "/pedidos", "/cuenta", "/seguridad"]);
   });
   it("solo el dueño ve «Plan y pagos»; un administrador no", () => {
     expect(hrefs({ canPay: true })).toContain("/plan");
@@ -39,6 +39,7 @@ describe("menú lateral", () => {
   it("sin negocio no aparecen Equipo ni Plan y pagos, aunque los permisos digan que sí", () => {
     const h = hrefs({ hasTenant: false, canManage: true, canPay: true });
     expect(h).toEqual(["/seguridad"]);
+    expect(h).not.toContain("/cuenta");
   });
   it("si el plan no incluye ningún módulo, no hay grupo «Mi negocio» vacío", () => {
     const l = layoutFor({ type: "citas", hasServices: true, hasProducts: true, allowed: [] });
