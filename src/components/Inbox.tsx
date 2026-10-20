@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CONTACT_LABELS, CONTACT_LABEL_TEXT, CONVERSATION_STATUS_LABEL, MEDIA_LABEL, WORK_TYPE_LABEL, type ContactLabel, type WorkType } from "@/lib/work/labels";
 import { messageTime, relativeTime } from "@/lib/work/time";
+import { EmptyState } from "@/components/EmptyState";
 
 type Status = "bot" | "human" | "closed";
 interface ConvRow {
@@ -245,8 +246,13 @@ export function Inbox({ initialId }: { initialId: string | null }) {
         {first === null ? (
           <p className="muted-dark mt-6" role="status">Cargando…</p>
         ) : rows.length === 0 ? (
-          <div className="card-light mt-6" style={{ padding: 24 }}>
-            <p className="muted">No hay conversaciones con este filtro.</p>
+          <div className="mt-6">
+            <EmptyState
+              title={filter === "activas" ? "Aún no hay conversaciones" : "No hay conversaciones con este filtro"}
+              text={filter === "activas" ? "Cuando un cliente te escriba por WhatsApp, su chat aparecerá aquí. Conecta tu número y pruébalo escribiéndole desde otro teléfono." : "Cambia el filtro de arriba para ver otras conversaciones."}
+              actions={filter === "activas" ? [{ href: "/whatsapp", label: "Conectar WhatsApp" }, { href: "/simulador", label: "Probar el asistente" }] : []}
+              help="conversaciones"
+            />
           </div>
         ) : (
           <ul className="mt-6 flex flex-col gap-3">

@@ -2,7 +2,7 @@ import type { ModuleLayout, OptionalModule } from "@/lib/modules";
 
 export type NavIcon =
   | "home" | "chat" | "today" | "calendar" | "box" | "receipt" | "bot" | "book" | "flask" | "wand"
-  | "phone" | "bolt" | "plug" | "users" | "user" | "card" | "shield" | "gear";
+  | "phone" | "bolt" | "plug" | "users" | "user" | "help" | "card" | "shield" | "gear";
 
 export interface NavItem { href: string; label: string; hint: string; icon: NavIcon }
 export interface NavGroup { title: string | null; items: NavItem[] }
@@ -72,6 +72,7 @@ export function buildNav(i: NavInput): NavGroup[] {
     // Sin negocio, la administración es lo principal: va primero.
     if (i.hasTenant) account.push(admin); else account.unshift(admin);
   }
+  account.push({ href: "/ayuda", label: "Ayuda", hint: "Guías por pantalla y contacto", icon: "help" });
   groups.push({ title: i.hasTenant ? "Cuenta" : null, items: account });
   return groups;
 }
