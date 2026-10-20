@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNav, isActive, type NavInput } from "@/lib/nav";
+import { ADMIN_NAV, buildNav, isActive, type NavInput } from "@/lib/nav";
 import { layoutFor } from "@/lib/modules";
 
 const base: NavInput = { hasTenant: true, canManage: true, canPay: true, isSuperAdmin: false, layout: layoutFor({ type: "citas", hasServices: true, hasProducts: false }) };
@@ -56,5 +56,25 @@ describe("menú lateral", () => {
     expect(isActive("/agenda", "/agendar")).toBe(false);
     expect(isActive("/panel", "/hoy")).toBe(false);
     expect(isActive("/hoy", "/")).toBe(false);
+  });
+
+  it("dentro de /admin el súper admin ve su propio menú; los demás no", () => {
+    const admin = (i: Partial<NavInput>) => buildNav({ ...base, isSuperAdmin: true, adminMode: true, ...i });
+    expect(admin({}).map((g) => g.title)).toEqual(["Plataforma", "Cuenta"]);
+    expect(admin({}).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/planes", "/admin/cobros", "/panel", "/seguridad", "/ayuda"]);
+    // Sin negocio no hay «Mi negocio».
+    expect(admin({ hasTenant: false }).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/planes", "/admin/cobros", "/seguridad", "/ayuda"]);
+    // Quien no es súper admin no obtiene el menú de administración aunque lo pida.
+    const h = hrefs({ adminMode: true, isSuperAdmin: false });
+    expect(h.some((x) => x.startsWith("/admin"))).toBe(false);
+    expect(h).toContain("/panel");
+  });
+
+  it("«Resumen» solo está activo en /admin exacto", () => {
+    expect(ADMIN_NAV.map((x) => [x.href, x.exact === true])).toEqual([["/admin", true], ["/admin/negocios", false], ["/admin/planes", false], ["/admin/cobros", false]]);
+    expect(isActive("/admin", "/admin/negocios", true)).toBe(false);
+    expect(isActive("/admin", "/admin", true)).toBe(true);
+    expect(isActive("/admin/negocios", "/admin/negocios")).toBe(true);
+    expect(isActive("/admin", "/admin/negocios")).toBe(true); // sin «exact» se comporta como siempre
   });
 });

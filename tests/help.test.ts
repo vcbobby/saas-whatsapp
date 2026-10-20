@@ -24,7 +24,7 @@ describe("centro de ayuda", () => {
 
   it("cada pantalla del menú tiene su tema de ayuda", () => {
     const nav = buildNav({ isSuperAdmin: true, hasTenant: true, canManage: true, canPay: true, layout: layoutFor({ type: "citas", hasServices: true, hasProducts: true }) });
-    const hrefs = nav.flatMap((g) => g.items.map((i) => i.href)).filter((h) => !["/ayuda", "/admin", "/bienvenida"].includes(h));
+    const hrefs = nav.flatMap((g) => g.items.map((i) => i.href)).filter((h) => !["/ayuda", "/bienvenida"].includes(h));
     expect(hrefs.length).toBeGreaterThan(8);
     for (const h of hrefs) expect(topicForPath(h), h).not.toBeNull();
     expect(topicForPath("/conversaciones/abc")?.id).toBe("conversaciones");

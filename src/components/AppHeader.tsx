@@ -38,6 +38,7 @@ export async function AppHeader({
   showAdmin,
   showTeam,
   showWork = true,
+  adminMode = false,
 }: {
   email: string;
   roleLabel?: string;
@@ -45,9 +46,11 @@ export async function AppHeader({
   showTeam?: boolean;
   /** Hay un negocio detrás de esta pantalla. Se oculta en administración. */
   showWork?: boolean;
+  /** Dentro de /admin: menú de administración. */
+  adminMode?: boolean;
 }) {
   const { layout, canPay, hasTenant } = showWork ? await layoutForSession() : { layout: ALL_MAIN, canPay: false, hasTenant: false };
-  const groups = buildNav({ hasTenant, canManage: !!showTeam, canPay, isSuperAdmin: !!showAdmin, layout });
+  const groups = buildNav({ hasTenant, canManage: !!showTeam, canPay, isSuperAdmin: !!showAdmin, layout, adminMode });
   return (
     <Sidebar
       brandName={brand.name}

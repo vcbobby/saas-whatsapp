@@ -2,9 +2,9 @@ import type { ModuleLayout, OptionalModule } from "@/lib/modules";
 
 export type NavIcon =
   | "home" | "chat" | "today" | "calendar" | "box" | "receipt" | "bot" | "book" | "flask" | "wand"
-  | "phone" | "bolt" | "plug" | "users" | "user" | "help" | "card" | "shield" | "gear";
+  | "phone" | "bolt" | "plug" | "users" | "user" | "help" | "chart" | "store" | "tag" | "card" | "shield" | "gear";
 
-export interface NavItem { href: string; label: string; hint: string; icon: NavIcon }
+export interface NavItem { href: string; label: string; hint: string; icon: NavIcon; /** Solo está activo en esa ruta exacta (no en las de abajo). */ exact?: boolean }
 export interface NavGroup { title: string | null; items: NavItem[] }
 
 export interface NavInput {
@@ -15,6 +15,8 @@ export interface NavInput {
   /** Solo el dueño (fuera de soporte) puede pagar. */
   canPay: boolean;
   isSuperAdmin: boolean;
+  /** Estás dentro de /admin: el menú muestra las secciones de administración. */
+  adminMode?: boolean;
   layout: ModuleLayout;
 }
 
@@ -28,7 +30,24 @@ const MODULE: Record<OptionalModule, NavItem> = {
  * Menú lateral según quién mira: rol, plan y si es súper admin.
  * Lo que el plan no incluye no aparece (la página tampoco se puede abrir). Los grupos vacíos se quitan.
  */
+export const ADMIN_NAV: NavItem[] = [
+  { href: "/admin", label: "Resumen", hint: "Registros y estado de los negocios", icon: "chart", exact: true },
+  { href: "/admin/negocios", label: "Negocios", hint: "Estados, planes y soporte", icon: "store" },
+  { href: "/admin/planes", label: "Planes", hint: "Qué incluye cada plan y su precio", icon: "tag" },
+  { href: "/admin/cobros", label: "Cobros", hint: "Tasa, métodos de pago y comprobantes", icon: "card" },
+];
+
 export function buildNav(i: NavInput): NavGroup[] {
+  if (i.adminMode && i.isSuperAdmin) {
+    return [
+      { title: "Plataforma", items: ADMIN_NAV },
+      { title: "Cuenta", items: [
+        ...(i.hasTenant ? [{ href: "/panel", label: "Mi negocio", hint: "Volver a tu panel", icon: "home" as const }] : []),
+        { href: "/seguridad", label: "Seguridad", hint: "Contraseña y verificación", icon: "shield" as const },
+        { href: "/ayuda", label: "Ayuda", hint: "Guías por pantalla y contacto", icon: "help" as const },
+      ] },
+    ];
+  }
   const groups: NavGroup[] = [];
   if (i.hasTenant) {
     groups.push({
@@ -68,7 +87,7 @@ export function buildNav(i: NavInput): NavGroup[] {
   if (i.hasTenant && i.canPay) account.push({ href: "/plan", label: "Plan y pagos", hint: "Tu plan y su vencimiento", icon: "card" });
   account.push({ href: "/seguridad", label: "Seguridad", hint: "Contraseña y verificación", icon: "shield" });
   if (i.isSuperAdmin) {
-    const admin: NavItem = { href: "/admin", label: "Administración", hint: "Negocios, planes y cobros", icon: "gear" };
+    const admin: NavItem = { href: "/admin", label: "Administración", hint: "Resumen, negocios, planes y cobros", icon: "gear" };
     // Sin negocio, la administración es lo principal: va primero.
     if (i.hasTenant) account.push(admin); else account.unshift(admin);
   }
@@ -78,6 +97,7 @@ export function buildNav(i: NavInput): NavGroup[] {
 }
 
 /** ¿Este ítem es el de la página actual? «/agenda/configuracion» cuenta como «Agenda». */
-export function isActive(href: string, pathname: string): boolean {
+export function isActive(href: string, pathname: string, exact = false): boolean {
+  if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(href + "/");
 }
