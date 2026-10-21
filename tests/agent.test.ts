@@ -432,6 +432,12 @@ describe("envío seguro (nunca se duplica un mensaje al cliente)", () => {
     await expect(runAgent(job(t, m), d.raw)).rejects.toBeInstanceOf(LlmError);
     expect(d.send).not.toHaveBeenCalled();
     expect(await outRows(t)).toHaveLength(0);
+    // El fallo queda contado para el panel de salud (sin sumar respuestas ni tokens)...
+    const row = () => withTenant(t.tenantId, async (db) => (await db.query("SELECT replies, ai_errors, input_tokens FROM agent_usage_daily")).rows[0]);
+    expect(await row()).toMatchObject({ replies: 0, ai_errors: 1, input_tokens: "0" });
+    // ...y los intentos que sí funcionan no lo aumentan.
+    expect(await runAgent(job(t, m), d.raw)).toBe("replied");
+    expect(await row()).toMatchObject({ replies: 1, ai_errors: 1 });
   });
 
   it("una conversación a la vez: un segundo trabajo simultáneo espera (candado)", async () => {

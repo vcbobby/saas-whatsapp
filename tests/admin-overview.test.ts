@@ -82,6 +82,15 @@ afterAll(async () => {
 
 const dailySum = (o: AdminOverview) => o.daily.reduce((s, d) => s + d.n, 0);
 
+/** Otras pruebas corren a la vez y crean negocios y mensajes: si una cifra global se descuadra por eso, se repite con negocios nuevos. */
+async function retry(fn: (tag: string) => Promise<void>) {
+  let last: unknown;
+  for (let i = 0; i < 4; i++) {
+    try { await fn(`${i}`); return; } catch (e) { last = e; }
+  }
+  throw last;
+}
+
 describe("resumen del súper admin (admin_overview)", () => {
   it("solo lo lee un súper admin con verificación en dos pasos", async () => {
     const a = await register("normal");
@@ -92,26 +101,27 @@ describe("resumen del súper admin (admin_overview)", () => {
   });
 
   it("cuenta registros y estados, y la zona horaria inválida cae a UTC", async () => {
+    await retry(async (tag) => {
     const adm = await superAdmin("adm1");
     const h = hashOf(adm);
     const before = await getAdminOverview(h);
 
-    const t1 = await register("prueba");
-    const t2 = await register("vencida");
-    const t3 = await register("activa");
-    const t4 = await register("mora");
-    const t5 = await register("susp");
+    const t1 = await register(`prueba${tag}`);
+    const t2 = await register(`vencida${tag}`);
+    const t3 = await register(`activa${tag}`);
+    const t4 = await register(`mora${tag}`);
+    const t5 = await register(`susp${tag}`);
     await setTenant(t2.tenantId, { trialEnds: inDays(-2) });
     await setTenant(t3.tenantId, { status: "active", expires: inDays(3) });
     await setTenant(t4.tenantId, { status: "past_due" });
     await setTenant(t5.tenantId, { status: "suspended" });
     // Activo con el plan ya vencido: no es «por vencer». Y uno registrado hace 10 días: cuenta en 30 días y en la semana previa, no en la última.
-    const t6 = await register("planvencido");
+    const t6 = await register(`planvencido${tag}`);
     await setTenant(t6.tenantId, { status: "active", expires: inDays(-1) });
     await ageTenant(t6.tenantId, 240);
-    const t7 = await register("hace5");
+    const t7 = await register(`hace5${tag}`);
     await ageTenant(t7.tenantId, 120);
-    const t8 = await register("hace7y12h");
+    const t8 = await register(`hace7y12h${tag}`);
     await ageTenant(t8.tenantId, 7 * 24 + 12);
     void t1;
 
@@ -141,18 +151,21 @@ describe("resumen del súper admin (admin_overview)", () => {
     const utc = (await getPool().query("SELECT admin_overview($1, 'Nada/Existe') AS o", [h])).rows[0].o;
     expect(utc.tz).toBe("UTC");
     expect((await getAdminOverview(h)).tz).toBe("America/Caracas");
+    });
   });
 
   it("cuenta los pagos por revisar", async () => {
+    await retry(async (tag) => {
     const adm = await superAdmin("adm2");
     const h = hashOf(adm);
     const before = await getAdminOverview(h);
-    const t = await register("pago");
+    const t = await register(`pago${tag}`);
     const plan = (await owner.query<{ id: string }>("SELECT id FROM plans ORDER BY position LIMIT 1")).rows[0]!.id;
     for (const status of ["por_revisar", "por_revisar", "pendiente", "confirmado", "rechazado"]) {
       await owner.query("INSERT INTO payments (tenant_id, plan_id, months, method, amount_usd_cents, quote_expires_at, status) VALUES ($1,$2,1,'paypal',500,now() + interval '1 day',$3)", [t.tenantId, plan, status]);
     }
     expect((await getAdminOverview(h)).paymentsToReview - before.paymentsToReview).toBe(2);
+    });
   });
 });
 

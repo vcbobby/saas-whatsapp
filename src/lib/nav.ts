@@ -2,7 +2,7 @@ import type { ModuleLayout, OptionalModule } from "@/lib/modules";
 
 export type NavIcon =
   | "home" | "chat" | "today" | "calendar" | "box" | "receipt" | "bot" | "book" | "flask" | "wand"
-  | "phone" | "bolt" | "plug" | "users" | "user" | "help" | "chart" | "store" | "tag" | "card" | "shield" | "gear";
+  | "phone" | "bolt" | "plug" | "users" | "user" | "help" | "chart" | "pulse" | "store" | "tag" | "card" | "shield" | "gear";
 
 export interface NavItem { href: string; label: string; hint: string; icon: NavIcon; /** Solo está activo en esa ruta exacta (no en las de abajo). */ exact?: boolean }
 export interface NavGroup { title: string | null; items: NavItem[] }
@@ -33,6 +33,7 @@ const MODULE: Record<OptionalModule, NavItem> = {
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Resumen", hint: "Registros y estado de los negocios", icon: "chart", exact: true },
   { href: "/admin/negocios", label: "Negocios", hint: "Estados, planes y soporte", icon: "store" },
+  { href: "/admin/uso", label: "Uso y salud", hint: "Módulos, consumo de IA y errores", icon: "pulse" },
   { href: "/admin/planes", label: "Planes", hint: "Qué incluye cada plan y su precio", icon: "tag" },
   { href: "/admin/cobros", label: "Cobros", hint: "Tasa, métodos de pago y comprobantes", icon: "card" },
 ];

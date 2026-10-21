@@ -184,7 +184,7 @@ describe("preguntar al copiloto", () => {
     await q(t, "segunda", s.llm);
     expect(await usage(t)).toEqual({ questions: 2, input_tokens: "240", output_tokens: "60" });
     const cols = await owner.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'copilot_usage_daily' ORDER BY 1");
-    expect(cols.rows.map((c) => c.column_name)).toEqual(["day", "input_tokens", "output_tokens", "questions", "tenant_id"]);
+    expect(cols.rows.map((c) => c.column_name)).toEqual(["ai_errors", "day", "input_tokens", "output_tokens", "questions", "tenant_id"]);
   });
 
   it("al llegar al tope diario no llama a la IA", async () => {
@@ -223,6 +223,11 @@ describe("preguntar al copiloto", () => {
     const boom = stub(new Error("bug"));
     await expect(q(t, "hola", boom.llm)).rejects.toThrow("bug");
     expect((await usage(t))!.questions).toBe(0);
+    // Cada fallo de la IA queda contado (panel de salud del súper admin); lo que no es de la IA, no.
+    const errs = () => withTenant(t.tenantId, (db) => db.query("SELECT ai_errors FROM copilot_usage_daily WHERE tenant_id = $1", [t.tenantId])).then((r) => r.rows[0]!.ai_errors as number);
+    expect(await errs()).toBe(2);
+    await q(t, "otra", stub().llm);
+    expect(await errs()).toBe(2);
   });
 
   it.each([

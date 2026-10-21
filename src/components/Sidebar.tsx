@@ -21,6 +21,7 @@ const PATHS: Record<NavIcon, string> = {
   bolt: "M13 3L5 13h6l-1 8 8-10h-6z",
   plug: "M9 3v5M15 3v5M6 8h12v3a6 6 0 01-12 0zM12 17v4",
   users: "M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 3-5 6-5s6 2 6 5M17 8a2.5 2.5 0 110 5M17 15c2.5 0 4 1.5 4 4",
+  pulse: "M3 12h4l3-8 4 16 3-8h4",
   chart: "M4 20V10m6 10V4m6 16v-7m4 7H2",
   store: "M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9a2.7 2.7 0 005.3 0 2.7 2.7 0 005.4 0A2.7 2.7 0 0020 9M9.5 20v-5h5v5",
   tag: "M3 12V4h8l10 10-8 8L3 12zm5-4h.01",

@@ -167,6 +167,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     steps: [
       "Resumen: registros de la semana, negocios en prueba y con plan activo, y lo que requiere atención (pagos por revisar, planes por vencer).",
       "Negocios: cambia el estado o el plan de un negocio y entra como soporte (pide un motivo, dura 30 minutos y queda en el registro).",
+      "Uso y salud: módulos que usan los negocios, consumo de IA por negocio y errores de los últimos 7 días. Solo cifras, nunca mensajes de clientes.",
       "Planes: qué incluye cada plan y su precio. Cobros: tasa del dólar, métodos de pago y revisión de comprobantes.",
     ],
     links: [{ href: "/admin", label: "Abrir el resumen" }, { href: "/admin/negocios", label: "Ver negocios" }],
