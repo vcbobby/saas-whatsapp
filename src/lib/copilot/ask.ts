@@ -1,6 +1,7 @@
 import { getLlmProvider } from "@/lib/ai";
 import { LlmError, type ChatMessage, type LlmProvider } from "@/lib/ai/provider";
 import { checkOutput, newCanary, normalizeUntrusted } from "@/lib/agent/safety";
+import { recordAiError } from "@/lib/ai/errors";
 import { getLlmEnv } from "@/lib/env";
 import { withTenant } from "@/lib/db";
 import { buildSnapshot } from "@/lib/summary/snapshot";
@@ -84,7 +85,10 @@ export async function askCopilot(
     const turns: ChatMessage[] = all.map((m): ChatMessage => ({ role: m.role, content: normalizeUntrusted(m.content).slice(0, m.role === "user" ? MAX_QUESTION_CHARS : MAX_TURN_CHARS) }));
 
     const llm = deps.llm ?? getLlmProvider();
-    const out = await llm.generate({ system, messages: turns, maxTokens: MAX_ANSWER_TOKENS, temperature: 0.2 });
+    const out = await llm.generate({ system, messages: turns, maxTokens: MAX_ANSWER_TOKENS, temperature: 0.2 }).catch(async (e: unknown) => {
+      await recordAiError(a.tenantId, "copilot");
+      throw e;
+    });
 
     await withTenant(a.tenantId, (db) =>
       db.query("UPDATE copilot_usage_daily SET input_tokens = input_tokens + $2, output_tokens = output_tokens + $3 WHERE tenant_id = $1 AND day = (now() AT TIME ZONE 'utc')::date", [a.tenantId, out.inputTokens, out.outputTokens]),

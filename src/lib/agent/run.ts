@@ -1,4 +1,5 @@
 import { planModulesOf } from "@/lib/plans/modules";
+import { recordAiError } from "@/lib/ai/errors";
 import { loadPlan, repliesThisMonth, type PlanModule } from "@/lib/plans/usage";
 import { getLlmProvider } from "@/lib/ai";
 import type { LlmProvider } from "@/lib/ai/provider";
@@ -302,11 +303,16 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
       if (!(err instanceof PlanSkip)) console.error("[agente] catálogo no disponible:", err instanceof Error ? err.message : err);
     }
     const canary = newCanary();
-    const out = await llm.generate({
-      system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text, catalog: catalog?.text }),
-      messages: buildTurns(history),
-      maxTokens: LLM_MAX_TOKENS,
-    });
+    const out = await llm
+      .generate({
+        system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text, catalog: catalog?.text }),
+        messages: buildTurns(history),
+        maxTokens: LLM_MAX_TOKENS,
+      })
+      .catch(async (e: unknown) => {
+        await recordAiError(tenantId, "agent"); // para el panel de salud; el error sigue su curso (reintento de la cola)
+        throw e;
+      });
     usage = { input: out.inputTokens, output: out.outputTokens };
     const request = menu ? parseBookingRequest(out.text) : null;
     const orderReq = catalog ? parseOrderRequest(out.text) : null;
