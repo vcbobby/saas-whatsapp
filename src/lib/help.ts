@@ -163,10 +163,21 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: "/seguridad", label: "Abrir Seguridad" }],
   },
   {
+    id: "soporte", title: "Soporte", summary: "Escríbenos cuando algo no funcione o tengas una duda que la Ayuda no resuelve.",
+    steps: [
+      "Pulsa «Nueva consulta», escribe un asunto corto y cuéntanos qué pasó (qué pantalla, qué esperabas, qué ocurrió). No escribas contraseñas.",
+      "Te respondemos en la misma consulta: cuando haya respuesta verás «Soporte respondió». Puedes seguir escribiendo ahí.",
+      "Cuando se resuelva, pulsa «Ya se resolvió: cerrar». Si escribes de nuevo en una consulta cerrada, se reabre.",
+      "Puedes tener hasta 5 consultas abiertas a la vez. Las abre el dueño o un administrador.",
+    ],
+    links: [{ href: "/soporte", label: "Abrir Soporte" }, { href: "/ayuda", label: "Ver la Ayuda" }],
+  },
+  {
     id: "administracion", title: "Administración", summary: "Para el súper admin: cómo va la plataforma y sus negocios.",
     steps: [
       "Resumen: registros de la semana, negocios en prueba y con plan activo, y lo que requiere atención (pagos por revisar, planes por vencer).",
       "Negocios: cambia el estado o el plan de un negocio y entra como soporte (pide un motivo, dura 30 minutos y queda en el registro).",
+      "Soporte: consultas que te escriben los negocios; respondes ahí mismo (el negocio ve «Soporte», no tu correo) y puedes cerrarlas o reabrirlas.",
       "Uso y salud: módulos que usan los negocios, consumo de IA por negocio y errores de los últimos 7 días. Solo cifras, nunca mensajes de clientes.",
       "Planes: qué incluye cada plan y su precio. Cobros: tasa del dólar, métodos de pago y revisión de comprobantes.",
     ],
@@ -189,7 +200,7 @@ export function topicForPath(pathname: string): HelpTopic | null {
   const map: Record<string, string> = {
     "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
-    "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion",
+    "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
   };
   const id = map[seg];
   return id ? (HELP_TOPICS.find((t) => t.id === id) ?? null) : null;

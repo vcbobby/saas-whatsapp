@@ -9,7 +9,7 @@ const titles = (i: Partial<NavInput>) => buildNav({ ...base, ...i }).map((g) => 
 describe("menú lateral", () => {
   it("el dueño ve todo, en grupos con nombre", () => {
     expect(titles({})).toEqual([null, "Mi negocio", "Asistente", "Automatizar", "Cuenta"]);
-    expect(hrefs({})).toEqual(["/panel", "/hoy", "/conversaciones", "/agenda", "/catalogo", "/pedidos", "/agente", "/conocimiento", "/simulador", "/copiloto", "/whatsapp", "/automatizaciones", "/conexiones", "/cuenta", "/equipo", "/plan", "/seguridad", "/ayuda"]);
+    expect(hrefs({})).toEqual(["/panel", "/hoy", "/conversaciones", "/agenda", "/catalogo", "/pedidos", "/agente", "/conocimiento", "/simulador", "/copiloto", "/whatsapp", "/automatizaciones", "/conexiones", "/cuenta", "/soporte", "/equipo", "/plan", "/seguridad", "/ayuda"]);
   });
   it("los módulos que el negocio usa van primero; los demás siguen a un clic", () => {
     const h = hrefs({ layout: layoutFor({ type: "catalogo", hasServices: false, hasProducts: true }) });
@@ -61,9 +61,9 @@ describe("menú lateral", () => {
   it("dentro de /admin el súper admin ve su propio menú; los demás no", () => {
     const admin = (i: Partial<NavInput>) => buildNav({ ...base, isSuperAdmin: true, adminMode: true, ...i });
     expect(admin({}).map((g) => g.title)).toEqual(["Plataforma", "Cuenta"]);
-    expect(admin({}).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/uso", "/admin/planes", "/admin/cobros", "/panel", "/seguridad", "/ayuda"]);
+    expect(admin({}).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/soporte", "/admin/uso", "/admin/planes", "/admin/cobros", "/panel", "/seguridad", "/ayuda"]);
     // Sin negocio no hay «Mi negocio».
-    expect(admin({ hasTenant: false }).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/uso", "/admin/planes", "/admin/cobros", "/seguridad", "/ayuda"]);
+    expect(admin({ hasTenant: false }).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/soporte", "/admin/uso", "/admin/planes", "/admin/cobros", "/seguridad", "/ayuda"]);
     // Quien no es súper admin no obtiene el menú de administración aunque lo pida.
     const h = hrefs({ adminMode: true, isSuperAdmin: false });
     expect(h.some((x) => x.startsWith("/admin"))).toBe(false);
@@ -71,7 +71,7 @@ describe("menú lateral", () => {
   });
 
   it("«Resumen» solo está activo en /admin exacto", () => {
-    expect(ADMIN_NAV.map((x) => [x.href, x.exact === true])).toEqual([["/admin", true], ["/admin/negocios", false], ["/admin/uso", false], ["/admin/planes", false], ["/admin/cobros", false]]);
+    expect(ADMIN_NAV.map((x) => [x.href, x.exact === true])).toEqual([["/admin", true], ["/admin/negocios", false], ["/admin/soporte", false], ["/admin/uso", false], ["/admin/planes", false], ["/admin/cobros", false]]);
     expect(isActive("/admin", "/admin/negocios", true)).toBe(false);
     expect(isActive("/admin", "/admin", true)).toBe(true);
     expect(isActive("/admin/negocios", "/admin/negocios")).toBe(true);

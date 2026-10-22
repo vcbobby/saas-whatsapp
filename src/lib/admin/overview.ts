@@ -19,6 +19,7 @@ const overviewSchema = z.object({
   signups: z.object({ last7: z.number(), prev7: z.number(), last30: z.number() }),
   users: z.number(),
   paymentsToReview: z.number(),
+  supportOpen: z.number(),
   daily: z.array(z.object({ day: z.string(), n: z.number() })),
   recent: z.array(z.object({ name: z.string(), status: z.string(), createdAt: z.string() })),
 });

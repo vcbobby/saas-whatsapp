@@ -32,7 +32,7 @@ async function HelpContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Centro de ayuda</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Ayuda</h1>
-        <p className="muted-dark mt-3 max-w-[640px]">Una guía corta por cada pantalla. ¿No encuentras lo que buscas? Escríbenos a <a className="link" href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>.</p>
+        <p className="muted-dark mt-3 max-w-[640px]">Una guía corta por cada pantalla. ¿No encuentras lo que buscas? Escríbenos desde <Link href="/soporte" className="link">Soporte</Link> o a <a className="link" href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>.</p>
 
         <nav aria-label="Temas de ayuda" className="mt-8 flex flex-wrap gap-2">
           {HELP_TOPICS.map((t) => <a key={t.id} href={`#${t.id}`} className="badge badge-neutral" style={{ textDecoration: "none" }}>{t.title}</a>)}

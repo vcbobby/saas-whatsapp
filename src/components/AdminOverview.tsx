@@ -28,6 +28,7 @@ export function adminAttention(o: AdminOverview): { n: number; text: string; hre
   const t = o.tenants;
   return [
     { n: o.paymentsToReview, text: o.paymentsToReview === 1 ? "pago por revisar" : "pagos por revisar", href: "/admin/cobros" },
+    { n: o.supportOpen, text: o.supportOpen === 1 ? "consulta de soporte por responder" : "consultas de soporte por responder", href: "/admin/soporte" },
     { n: t.expiringSoon, text: t.expiringSoon === 1 ? "plan vence en 7 días" : "planes vencen en 7 días", href: "/admin/negocios" },
     { n: t.trialExpired, text: t.trialExpired === 1 ? "prueba vencida sin pagar" : "pruebas vencidas sin pagar", href: "/admin/negocios" },
     { n: t.pastDue, text: t.pastDue === 1 ? "negocio con pago pendiente" : "negocios con pago pendiente", href: "/admin/negocios" },
