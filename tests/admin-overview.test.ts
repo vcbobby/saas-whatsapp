@@ -172,15 +172,16 @@ describe("resumen del súper admin (admin_overview)", () => {
 const base: AdminOverview = {
   tz: "America/Caracas", today: "2026-10-20",
   tenants: { total: 0, trial: 0, trialExpired: 0, active: 0, expiringSoon: 0, pastDue: 0, suspended: 0 },
-  signups: { last7: 0, prev7: 0, last30: 0 }, users: 0, paymentsToReview: 0, daily: [], recent: [],
+  signups: { last7: 0, prev7: 0, last30: 0 }, users: 0, paymentsToReview: 0, supportOpen: 0, daily: [], recent: [],
 };
 
 describe("textos del resumen", () => {
   it("la atención solo muestra lo que tiene cifra y enlaza a la sección correcta", () => {
     expect(adminAttention(base)).toEqual([]);
-    const a = adminAttention({ ...base, paymentsToReview: 2, tenants: { ...base.tenants, expiringSoon: 1, trialExpired: 3, pastDue: 1 } });
+    const a = adminAttention({ ...base, paymentsToReview: 2, supportOpen: 4, tenants: { ...base.tenants, expiringSoon: 1, trialExpired: 3, pastDue: 1 } });
     expect(a.map((x) => [x.n, x.text, x.href])).toEqual([
       [2, "pagos por revisar", "/admin/cobros"],
+      [4, "consultas de soporte por responder", "/admin/soporte"],
       [1, "plan vence en 7 días", "/admin/negocios"],
       [3, "pruebas vencidas sin pagar", "/admin/negocios"],
       [1, "negocio con pago pendiente", "/admin/negocios"],
