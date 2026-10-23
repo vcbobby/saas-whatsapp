@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalLinks } from "@/components/LegalShell";
 import { brand } from "@/config/brand";
 
 export default function Home() {
@@ -35,6 +36,7 @@ export default function Home() {
           </Link>
         </div>
       </main>
+      <footer className="container-app pb-8"><LegalLinks /></footer>
     </div>
   );
 }

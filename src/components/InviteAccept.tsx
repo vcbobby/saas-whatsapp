@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 import { postJson } from "@/lib/client";
+import { ConsentCheckbox } from "./ConsentCheckbox";
 
 /** mode "signup": persona nueva (elige contraseña). mode "accept": ya tiene sesión con ese correo. */
 export function InviteAccept({ token, mode, email }: { token: string; mode: "signup" | "accept"; email: string }) {
@@ -11,16 +12,18 @@ export function InviteAccept({ token, mode, email }: { token: string; mode: "sig
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [show, setShow] = useState(false);
+  const [accepted, setAccepted] = useState(false);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
+    if (mode === "signup" && !accepted) { setError("Para continuar debes aceptar los términos y la política de privacidad."); return; }
     setBusy(true);
     setError(null);
     const password = String(new FormData(e.currentTarget).get("password") ?? "");
     const r =
       mode === "signup"
-        ? await postJson("/api/invitations/signup", { token, password })
+        ? await postJson("/api/invitations/signup", { token, password, acceptTerms: true })
         : await postJson("/api/invitations/accept", { token });
     setBusy(false);
     if (r.ok) {
@@ -49,6 +52,7 @@ export function InviteAccept({ token, mode, email }: { token: string; mode: "sig
             </div>
             <span className="hint">Mínimo 10 caracteres.</span>
           </div>
+          <ConsentCheckbox id={`${uid}-acepto`} checked={accepted} onChange={setAccepted} invalid={!!error && !accepted} />
         </>
       )}
       <div role="alert" aria-live="assertive">{error && <p className="alert-error">{error}</p>}</div>

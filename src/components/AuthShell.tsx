@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { brand } from "@/config/brand";
+import { LegalLinks } from "./LegalShell";
 
 export function AuthShell({ eyebrow, title, intro, children }: { eyebrow: string; title: string; intro?: string; children: ReactNode }) {
   return (
@@ -20,6 +21,7 @@ export function AuthShell({ eyebrow, title, intro, children }: { eyebrow: string
           <div className="mt-8">{children}</div>
         </section>
       </main>
+      <footer className="container-app pb-8"><LegalLinks className="justify-center" /></footer>
     </div>
   );
 }

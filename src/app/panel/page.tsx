@@ -7,7 +7,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { LegalReaccept } from "@/components/LegalReaccept";
 import { StopImpersonationButton } from "@/components/StopImpersonationButton";
+import { getLegalStatus } from "@/lib/legal/consent";
 import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
 import { withTenant } from "@/lib/db";
@@ -51,6 +53,8 @@ async function PanelContent() {
   if (ctx && !ctx.impersonating && tenant?.onboarding_state === "pending" && can(ctx.role, "agent:manage")) redirect("/bienvenida");
 
   const daysLeft = tenant?.status === "trial" ? tenant.days_left : null;
+  // Si falla la consulta, la pantalla sigue funcionando (el aviso solo se omite).
+  const legal = ctx?.impersonating ? null : await getLegalStatus(session.userId).catch(() => null);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -72,6 +76,7 @@ async function PanelContent() {
       />
 
       <main className="container-app flex-1 pb-24 pt-8">
+        {legal && !legal.upToDate && <LegalReaccept version={legal.current} first={legal.accepted === null} />}
         {!ctx || !tenant ? (
           <section className="card-light" style={{ maxWidth: 640 }}>
             <p className="eyebrow">Sin negocio</p>

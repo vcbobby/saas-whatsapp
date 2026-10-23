@@ -115,6 +115,28 @@ export function getLlmEnv(): LlmEnv {
   return result.data;
 }
 
+// ----------------------------------------------------- consentimiento legal
+const legalSchema = z
+  .object({
+    // "required": para crear una cuenta hay que aceptar los términos (es lo normal). "optional" solo sirve para las pruebas automáticas.
+    LEGAL_CONSENT: z.enum(["required", "optional"]).default("required"),
+    APP_ENV: z.enum(["local", "test", "staging", "production"]),
+  })
+  .superRefine((v, ctx) => {
+    if (v.LEGAL_CONSENT === "optional" && (v.APP_ENV === "staging" || v.APP_ENV === "production")) {
+      ctx.addIssue({ code: "custom", path: ["LEGAL_CONSENT"], message: "El consentimiento opcional no se permite en staging ni producción" });
+    }
+  });
+
+export function getConsentMode(): "required" | "optional" {
+  const result = legalSchema.safeParse(process.env);
+  if (!result.success) {
+    const campos = result.error.issues.map((i) => `${i.path.join(".")} (${i.message})`).join(", ");
+    throw new Error(`Variables de consentimiento inválidas: ${campos}`);
+  }
+  return result.data.LEGAL_CONSENT;
+}
+
 // ----------------------------------------------------- modo de envío (simulador)
 const sendModeSchema = z
   .object({
