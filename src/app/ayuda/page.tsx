@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { LegalLinks } from "@/components/LegalShell";
 import { ScrollToHash } from "@/components/ScrollToHash";
 import { brand } from "@/config/brand";
 import { can } from "@/lib/auth/permissions";
@@ -59,6 +60,7 @@ async function HelpContent() {
               ))}
             </div>
           </section>
+          <LegalLinks />
         </div>
       </main>
     </div>

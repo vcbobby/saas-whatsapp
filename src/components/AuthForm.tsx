@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
+import { ConsentCheckbox } from "./ConsentCheckbox";
 import { MfaCodeForm } from "./MfaCodeForm";
 
 type Mode = "login" | "signup";
@@ -27,6 +28,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [pending, setPending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [needsCode, setNeedsCode] = useState(false);
+  const [accepted, setAccepted] = useState(false);
   const copy = COPY[mode];
   const errorId = `${uid}-error`;
 
@@ -37,11 +39,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setPending(true);
 
     const form = new FormData(e.currentTarget);
-    const payload: Record<string, string> = {
+    const payload: Record<string, string | boolean> = {
       email: String(form.get("email") ?? ""),
       password: String(form.get("password") ?? ""),
     };
-    if (mode === "signup") payload.businessName = String(form.get("businessName") ?? "");
+    if (mode === "signup") {
+      if (!accepted) { setError("Para continuar debes aceptar los términos y la política de privacidad."); setPending(false); return; }
+      payload.businessName = String(form.get("businessName") ?? "");
+      payload.acceptTerms = true;
+    }
 
     try {
       const res = await fetch(copy.endpoint, {
@@ -133,6 +139,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         </div>
         {mode === "signup" && <span className="hint">Mínimo 10 caracteres. Una frase larga funciona mejor que una palabra rara.</span>}
       </div>
+
+      {mode === "signup" && <ConsentCheckbox id={`${uid}-acepto`} checked={accepted} onChange={setAccepted} invalid={!!error && !accepted} />}
 
       <div id={errorId} role="alert" aria-live="assertive">
         {error && <p className="alert-error">{error}</p>}

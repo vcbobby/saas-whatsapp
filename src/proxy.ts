@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { LEGAL_SLUGS } from "@/lib/legal/docs";
 import { securityHeaders } from "@/lib/security/headers";
 
 const isAdminPath = (p: string) => p === "/admin" || p.startsWith("/admin/");
+
+/** /legal/<algo> que no es un documento: debe dar 404 de verdad (la página, al ser dinámica, respondería 200 con un aviso). */
+const isUnknownLegalDoc = (p: string) => {
+  const m = /^\/legal\/([^/]+)\/?$/.exec(p);
+  if (!m) return false;
+  try {
+    return !(LEGAL_SLUGS as readonly string[]).includes(decodeURIComponent(m[1]!));
+  } catch {
+    return true; // mal codificada: tampoco es un documento
+  }
+};
 
 /**
  * Páginas de administración: para quien no sea súper admin deben responder 404 REAL (estado HTTP incluido),
@@ -24,7 +36,7 @@ async function mayEnterAdmin(request: NextRequest): Promise<boolean> {
 // Se lee en cada petición (no al compilar), así APP_ENV de tu servidor decide si hay HSTS, etc.
 export async function proxy(request: NextRequest) {
   const response =
-    isAdminPath(request.nextUrl.pathname) && !(await mayEnterAdmin(request))
+    (isAdminPath(request.nextUrl.pathname) && !(await mayEnterAdmin(request))) || isUnknownLegalDoc(request.nextUrl.pathname)
       ? NextResponse.rewrite(new URL("/no-existe", request.url)) // una dirección que no existe: Next responde su 404
       : NextResponse.next();
   const headers = securityHeaders({

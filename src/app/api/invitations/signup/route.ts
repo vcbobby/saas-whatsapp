@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { startSession } from "@/lib/auth/session";
 import { hashToken } from "@/lib/auth/tokens";
 import { inviteSignupSchema } from "@/lib/auth/validation";
+import { CONSENT_REQUIRED_MESSAGE, consentVersionFor } from "@/lib/legal/consent";
 
 /** Crea la cuenta de una persona invitada. El correo sale de la invitación. */
 export const POST = route(async (req) => {
@@ -12,13 +13,16 @@ export const POST = route(async (req) => {
   const body = await readJson(req, inviteSignupSchema);
   if (!body.ok) return body.response;
 
+  const version = consentVersionFor(body.data.acceptTerms);
+  if (version === "missing") return errorResponse(400, "debes_aceptar_terminos", CONSENT_REQUIRED_MESSAGE);
+
   const passwordHash = await hashPassword(body.data.password);
   try {
-    const r = await getPool().query<{ invite_signup: string }>(
-      "SELECT invite_signup($1, $2)",
-      [hashToken(body.data.token), passwordHash],
+    const r = await getPool().query<{ invite_signup_consent: string }>(
+      "SELECT invite_signup_consent($1, $2, $3)",
+      [hashToken(body.data.token), passwordHash, version],
     );
-    const { setCookie } = await startSession(r.rows[0]!.invite_signup, req);
+    const { setCookie } = await startSession(r.rows[0]!.invite_signup_consent, req);
     return jsonResponse({ ok: true }, 201, { "Set-Cookie": setCookie });
   } catch (err) {
     const e = err as { code?: string };

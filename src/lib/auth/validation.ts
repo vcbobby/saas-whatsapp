@@ -18,6 +18,8 @@ export const signupSchema = z
     email: emailSchema,
     password: passwordSchema,
     businessName: z.string().trim().min(2).max(120),
+    // «Acepto los términos y la política de privacidad». El servidor decide si es obligatorio (LEGAL_CONSENT).
+    acceptTerms: z.literal(true).optional(),
   })
   .refine(
     (d) => {
@@ -100,6 +102,7 @@ export const inviteTokenSchema = z.object({ token: z.string().regex(/^[A-Za-z0-9
 export const inviteSignupSchema = z.object({
   token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   password: passwordSchema,
+  acceptTerms: z.literal(true).optional(),
 });
 
 // ---------------------------------------------------------------- WhatsApp
