@@ -22,6 +22,7 @@ export const POST = route(async (req) => {
   const name = await withTenant(tenantId, async (db) => (await db.query("SELECT name FROM tenants WHERE id = $1", [tenantId])).rows[0]?.name as string | undefined);
   const res = await askCopilot({ tenantId, businessName: name ?? "el negocio", question: body.data.question, history: body.data.history });
   if (res.kind === "limit") return errorResponse(429, "limite_diario", "Llegaste al límite de preguntas de hoy. Mañana se renueva; mientras tanto revisa Hoy, Agenda o Pedidos.");
+  if (res.kind === "paused") return errorResponse(503, "ia_pausada", "El copiloto está en pausa temporal. Intenta de nuevo más tarde.");
   if (res.kind === "unavailable") return errorResponse(503, "copiloto_no_disponible", "El copiloto no está disponible ahora. Intenta de nuevo en un momento.");
   return jsonResponse({ answer: res.answer, asOf: res.asOf, blocked: res.kind === "blocked" });
 });

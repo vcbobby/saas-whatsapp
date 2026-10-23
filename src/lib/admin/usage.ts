@@ -25,13 +25,7 @@ export async function getAdminUsage(tokenHash: Buffer): Promise<AdminUsage> {
   return usageSchema.parse(r.rows[0].u);
 }
 
-/** «1.234» / «12,3 mil» / «1,2 M» (millones) / «3 mil M» (miles de millones): tokens legibles. */
-export function formatTokens(v: number): string {
-  if (v < 10_000) return Math.round(v).toLocaleString("es");
-  if (v < 1_000_000) return `${(v / 1000).toLocaleString("es", { maximumFractionDigits: 1 })} mil`;
-  if (v < 1_000_000_000) return `${(v / 1_000_000).toLocaleString("es", { maximumFractionDigits: 2 })} M`;
-  return `${(v / 1_000_000_000).toLocaleString("es", { maximumFractionDigits: 2 })} mil M`; // mil millones
-}
+export { formatTokens } from "./format";
 
 export interface HealthItem { key: string; label: string; n: number; level: "ok" | "warn"; hint: string }
 

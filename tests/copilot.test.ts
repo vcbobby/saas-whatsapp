@@ -184,7 +184,7 @@ describe("preguntar al copiloto", () => {
     await q(t, "segunda", s.llm);
     expect(await usage(t)).toEqual({ questions: 2, input_tokens: "240", output_tokens: "60" });
     const cols = await owner.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'copilot_usage_daily' ORDER BY 1");
-    expect(cols.rows.map((c) => c.column_name)).toEqual(["ai_errors", "day", "input_tokens", "output_tokens", "questions", "tenant_id"]);
+    expect(cols.rows.map((c) => c.column_name)).toEqual(["ai_calls", "ai_errors", "day", "input_tokens", "output_tokens", "questions", "tenant_id"]);
   });
 
   it("al llegar al tope diario no llama a la IA", async () => {
