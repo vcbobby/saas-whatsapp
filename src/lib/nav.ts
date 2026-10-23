@@ -35,6 +35,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/negocios", label: "Negocios", hint: "Estados, planes y soporte", icon: "store" },
   { href: "/admin/soporte", label: "Soporte", hint: "Consultas de los negocios", icon: "mail" },
   { href: "/admin/uso", label: "Uso y salud", hint: "Módulos, consumo de IA y errores", icon: "pulse" },
+  { href: "/admin/costos", label: "Costos de IA", hint: "Presupuesto, topes y corte automático", icon: "bolt" },
   { href: "/admin/planes", label: "Planes", hint: "Qué incluye cada plan y su precio", icon: "tag" },
   { href: "/admin/cobros", label: "Cobros", hint: "Tasa, métodos de pago y comprobantes", icon: "card" },
 ];

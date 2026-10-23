@@ -35,9 +35,9 @@ export function adminAttention(o: AdminOverview): { n: number; text: string; hre
   ].filter((i) => i.n > 0);
 }
 
-export function AdminOverviewView({ o }: { o: AdminOverview }) {
+export function AdminOverviewView({ o, ai }: { o: AdminOverview; ai?: { n: number; text: string; href: string } | null }) {
   const t = o.tenants;
-  const attention = adminAttention(o);
+  const attention = [...adminAttention(o), ...(ai ? [ai] : [])];
   const fmt = new Intl.DateTimeFormat("es-VE", { dateStyle: "medium", timeZone: o.tz });
   return (
     <div className="mt-8 grid gap-6">

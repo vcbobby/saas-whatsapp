@@ -70,6 +70,19 @@ const llmSchema = z
     // Preguntas al copiloto del dueño por negocio y día (UTC). Acota el gasto de IA de esta función.
     COPILOT_DAILY_LIMIT: z.coerce.number().int().min(1).max(10_000).default(40),
     AGENT_HISTORY_MESSAGES: z.coerce.number().int().min(1).max(40).default(12),
+    // Protección de costos (paso 21). Todos son topes de seguridad; el presupuesto en dólares se configura en Administración → Costos.
+    // Tokens (entrada + salida) por negocio: asistente por día y por mes UTC, copiloto por día.
+    AGENT_TENANT_DAILY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(1_500_000),
+    AGENT_TENANT_MONTHLY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(20_000_000),
+    COPILOT_TENANT_DAILY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(300_000),
+    // Corte global por día (todos los negocios juntos) si en Administración no se fijó otro. Siempre activo.
+    AI_GLOBAL_DAILY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(20_000_000),
+    // Máximo de llamadas a la IA por un mismo mensaje (los reintentos de la cola no pueden gastar sin fin).
+    AGENT_MESSAGE_CALL_LIMIT: z.coerce.number().int().min(1).max(5).default(2),
+    // Bucles: mensajes entrantes de una misma conversación en 10 minutos (un bot contestándole a otro bot, por ejemplo).
+    AGENT_LOOP_INBOUND_LIMIT: z.coerce.number().int().min(3).max(1_000).default(30),
+    // Pico: respuestas del asistente por negocio en la última hora.
+    AGENT_TENANT_HOURLY_REPLY_LIMIT: z.coerce.number().int().min(1).max(100_000).default(150),
     APP_ENV: z.enum(["local", "test", "staging", "production"]),
   })
   .superRefine((v, ctx) => {

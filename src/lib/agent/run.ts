@@ -1,5 +1,6 @@
 import { planModulesOf } from "@/lib/plans/modules";
 import { recordAiError } from "@/lib/ai/errors";
+import { getAiGuard, recordAiUsage, reserveMessageCall, tenantTokens } from "@/lib/ai/guard";
 import { loadPlan, repliesThisMonth, type PlanModule } from "@/lib/plans/usage";
 import { getLlmProvider } from "@/lib/ai";
 import type { LlmProvider } from "@/lib/ai/provider";
@@ -110,7 +111,7 @@ function tenantActive(c: Ctx): boolean {
   return false;
 }
 
-type EventKind = "inyeccion" | "fuga_prompt" | "salida_bloqueada" | "limite_contacto";
+type EventKind = "inyeccion" | "fuga_prompt" | "salida_bloqueada" | "limite_contacto" | "bucle" | "reintentos_ia" | "pico_de_uso" | "limite_tokens" | "ia_pausada";
 
 /** Anota un incidente (solo tipo, mensaje y conversación; nunca el texto). Un reintento no lo duplica. */
 async function recordEvent(tenantId: string, conversationId: string, messageId: string, kind: EventKind) {
@@ -124,6 +125,32 @@ async function recordEvent(tenantId: string, conversationId: string, messageId: 
 
 /** Tras este número de mensajes de manipulación en una conversación, se deja de gastar IA y pasa a una persona. */
 const INJECTION_STRIKES = 3;
+
+/**
+ * Protección de costos (paso 21). Se revisa ANTES de gastar IA; si algo salta, se anota, la conversación pasa a una persona
+ * y no se llama al modelo. Orden: corte global → tope de tokens del negocio → bucle en la conversación → pico del negocio.
+ */
+async function costStop(tenantId: string, ctx: { conversationId: string; messageId: string }, env: ReturnType<typeof getLlmEnv>): Promise<boolean> {
+  const stop = async (kind: EventKind, reason: string) => {
+    await recordEvent(tenantId, ctx.conversationId, ctx.messageId, kind);
+    await handoff(tenantId, ctx.conversationId, reason);
+    return true;
+  };
+  if ((await getAiGuard()).blocked) return stop("ia_pausada", "ia_pausada");
+  const tokens = await tenantTokens(tenantId, "agent");
+  if (tokens.day >= env.AGENT_TENANT_DAILY_TOKEN_LIMIT || tokens.month >= env.AGENT_TENANT_MONTHLY_TOKEN_LIMIT) return stop("limite_tokens", "limite_tokens");
+  const rates = await withTenant(tenantId, async (db) => {
+    const r = await db.query(
+      `SELECT (SELECT count(*) FROM messages WHERE tenant_id = $1 AND conversation_id = $2 AND direction = 'in' AND received_at >= now() - interval '10 minutes')::int AS burst,
+              (SELECT count(*) FROM messages WHERE tenant_id = $1 AND direction = 'out' AND reply_to IS NOT NULL AND send_state <> 'failed' AND created_at >= now() - interval '1 hour')::int AS hour`,
+      [tenantId, ctx.conversationId],
+    );
+    return r.rows[0] as { burst: number; hour: number };
+  });
+  if (rates.burst >= env.AGENT_LOOP_INBOUND_LIMIT) return stop("bucle", "posible_bucle");
+  if (rates.hour >= env.AGENT_TENANT_HOURLY_REPLY_LIMIT) return stop("pico_de_uso", "pico_de_uso");
+  return false;
+}
 
 async function handoff(tenantId: string, conversationId: string, reason: string) {
   await withTenant(tenantId, (db) =>
@@ -224,6 +251,8 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
     return "limit_reached";
   }
 
+  if (await costStop(tenantId, ctx, env)) return "limit_reached";
+
   // Tope por cliente: cuántas respuestas del asistente recibió esta persona en la última hora y en las últimas 24 horas.
   const perContact = await withTenant(tenantId, async (db) => {
     const r = await db.query(
@@ -243,7 +272,6 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
   let text: string;
   let wantsHandoff = false;
   let handoffReason = "pedido_de_persona";
-  let usage = { input: 0, output: 0 };
   if (!(TEXT_TYPES.has(ctx.msgType) && ctx.body)) {
     text = fixed.nonText;
   } else if (contactLimited) {
@@ -303,6 +331,12 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
       if (!(err instanceof PlanSkip)) console.error("[agente] catálogo no disponible:", err instanceof Error ? err.message : err);
     }
     const canary = newCanary();
+    // Tope de llamadas por mensaje: los reintentos de la cola no pueden gastar IA sin fin con el mismo mensaje.
+    if (!(await reserveMessageCall(tenantId, ctx.messageId, env.AGENT_MESSAGE_CALL_LIMIT))) {
+      await recordEvent(tenantId, ctx.conversationId, ctx.messageId, "reintentos_ia");
+      await handoff(tenantId, ctx.conversationId, "reintentos_ia");
+      return "limit_reached";
+    }
     const out = await llm
       .generate({
         system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text, catalog: catalog?.text }),
@@ -313,7 +347,8 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
         await recordAiError(tenantId, "agent"); // para el panel de salud; el error sigue su curso (reintento de la cola)
         throw e;
       });
-    usage = { input: out.inputTokens, output: out.outputTokens };
+    // Los tokens se cuentan YA (no al enviar): si la respuesta se bloquea o el envío se reintenta, el gasto igual queda anotado.
+    await recordAiUsage(tenantId, "agent", out.inputTokens, out.outputTokens).catch((e: unknown) => console.error("[agente] no se pudo anotar el consumo:", e instanceof Error ? e.message : e));
     const request = menu ? parseBookingRequest(out.text) : null;
     const orderReq = catalog ? parseOrderRequest(out.text) : null;
     const parsed = parseReply(stripOrderMarkers(stripBookingMarkers(out.text)), fixed.handoff);
@@ -404,12 +439,9 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
         await db.query("UPDATE messages SET wa_message_id = $3, send_state = 'sent' WHERE tenant_id = $1 AND id = $2", [tenantId, outId, result.waMessageId]);
         await db.query("UPDATE conversations SET last_message_at = now() WHERE tenant_id = $1 AND id = $2", [tenantId, ctx.conversationId]);
         await db.query(
-          `INSERT INTO agent_usage_daily (tenant_id, day, replies, input_tokens, output_tokens)
-           VALUES ($1, (now() AT TIME ZONE 'utc')::date, 1, $2, $3)
-           ON CONFLICT (tenant_id, day) DO UPDATE SET replies = agent_usage_daily.replies + 1,
-             input_tokens = agent_usage_daily.input_tokens + EXCLUDED.input_tokens,
-             output_tokens = agent_usage_daily.output_tokens + EXCLUDED.output_tokens`,
-          [tenantId, usage.input, usage.output],
+          `INSERT INTO agent_usage_daily (tenant_id, day, replies) VALUES ($1, (now() AT TIME ZONE 'utc')::date, 1)
+           ON CONFLICT (tenant_id, day) DO UPDATE SET replies = agent_usage_daily.replies + 1`,
+          [tenantId],
         );
       });
       if (wantsHandoff) {

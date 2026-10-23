@@ -2,6 +2,7 @@ import { getLlmProvider } from "@/lib/ai";
 import { LlmError, type ChatMessage, type LlmProvider } from "@/lib/ai/provider";
 import { checkOutput, newCanary, normalizeUntrusted } from "@/lib/agent/safety";
 import { recordAiError } from "@/lib/ai/errors";
+import { getAiGuard, recordAiUsage } from "@/lib/ai/guard";
 import { getLlmEnv } from "@/lib/env";
 import { withTenant } from "@/lib/db";
 import { buildSnapshot } from "@/lib/summary/snapshot";
@@ -48,6 +49,7 @@ export type CopilotResult =
   | { kind: "ok"; answer: string; asOf: string }
   | { kind: "blocked"; answer: string; asOf: string }
   | { kind: "limit" }
+  | { kind: "paused" }
   | { kind: "unavailable" };
 
 /**
@@ -60,14 +62,18 @@ export async function askCopilot(
 ): Promise<CopilotResult> {
   const env = getLlmEnv();
 
-  // Se reserva el cupo del día antes de llamar a la IA (atómico: dos preguntas a la vez no pasan el tope).
+  // Corte global de IA (presupuesto o tokens del día de toda la plataforma): no se gasta nada.
+  if ((await getAiGuard()).blocked) return { kind: "paused" };
+
+  // Se reserva el cupo del día antes de llamar a la IA (atómico: dos preguntas a la vez no pasan el tope),
+  // por número de preguntas Y por tokens gastados hoy.
   const reserved = await withTenant(a.tenantId, async (db) => {
     const r = await db.query(
       `INSERT INTO copilot_usage_daily (tenant_id, day, questions) VALUES ($1, (now() AT TIME ZONE 'utc')::date, 1)
        ON CONFLICT (tenant_id, day) DO UPDATE SET questions = copilot_usage_daily.questions + 1
-         WHERE copilot_usage_daily.questions < $2
+         WHERE copilot_usage_daily.questions < $2 AND copilot_usage_daily.input_tokens + copilot_usage_daily.output_tokens < $3
        RETURNING questions`,
-      [a.tenantId, env.COPILOT_DAILY_LIMIT],
+      [a.tenantId, env.COPILOT_DAILY_LIMIT, env.COPILOT_TENANT_DAILY_TOKEN_LIMIT],
     );
     return r.rowCount === 1;
   });
@@ -90,9 +96,7 @@ export async function askCopilot(
       throw e;
     });
 
-    await withTenant(a.tenantId, (db) =>
-      db.query("UPDATE copilot_usage_daily SET input_tokens = input_tokens + $2, output_tokens = output_tokens + $3 WHERE tenant_id = $1 AND day = (now() AT TIME ZONE 'utc')::date", [a.tenantId, out.inputTokens, out.outputTokens]),
-    );
+    await recordAiUsage(a.tenantId, "copilot", out.inputTokens, out.outputTokens);
 
     const text = out.text.replace(/\u0000/g, "").trim().slice(0, MAX_ANSWER_CHARS);
     if (!text) return { kind: "blocked", answer: COPILOT_FIXED.empty, asOf: snapshot.generatedAt };

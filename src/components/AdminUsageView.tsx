@@ -98,7 +98,7 @@ export function AdminUsageView({ u }: { u: AdminUsage }) {
             </table>
           </div>
         )}
-        <p className="muted-dark mt-4 text-[13px]">Los tokens solo se cuentan cuando la respuesta se envía; un intento que falla después de llamar a la IA todavía no suma (se corrige en la protección de costos).</p>
+        <p className="muted-dark mt-4 text-[13px]">Los tokens se cuentan en el momento de cada llamada a la IA, aunque después la respuesta se bloquee o el envío se reintente. Una llamada que el proveedor rechaza no trae cifras y no suma tokens.</p>
       </section>
     </div>
   );

@@ -1,7 +1,7 @@
 import { withTenant } from "@/lib/db";
 
 /**
- * Anota que una llamada a la IA falló (para el panel de salud del súper admin).
+ * Anota que una llamada a la IA falló (para el panel de salud del súper admin); cuenta también como una llamada.
  * Nunca lanza: si esto falla, no debe tapar el error original ni cambiar lo que le pasa al cliente.
  */
 export async function recordAiError(tenantId: string, source: "agent" | "copilot"): Promise<void> {
@@ -9,8 +9,8 @@ export async function recordAiError(tenantId: string, source: "agent" | "copilot
     const table = source === "agent" ? "agent_usage_daily" : "copilot_usage_daily";
     await withTenant(tenantId, (db) =>
       db.query(
-        `INSERT INTO ${table} (tenant_id, day, ai_errors) VALUES ($1, (now() AT TIME ZONE 'utc')::date, 1)
-         ON CONFLICT (tenant_id, day) DO UPDATE SET ai_errors = ${table}.ai_errors + 1`,
+        `INSERT INTO ${table} (tenant_id, day, ai_errors, ai_calls) VALUES ($1, (now() AT TIME ZONE 'utc')::date, 1, 1)
+         ON CONFLICT (tenant_id, day) DO UPDATE SET ai_errors = ${table}.ai_errors + 1, ai_calls = ${table}.ai_calls + 1`,
         [tenantId],
       ),
     );

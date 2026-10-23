@@ -31,6 +31,11 @@ const REASON: Record<string, string> = {
   salida_bloqueada: "La respuesta traía un enlace o correo que el negocio no escribió; se bloqueó.",
   respuesta_vacia: "El asistente no generó una respuesta.",
   agente_fallo: "El asistente no pudo procesar el mensaje.",
+  limite_tokens: "El negocio llegó a su tope de consumo de IA.",
+  ia_pausada: "La IA está en pausa temporal en toda la plataforma.",
+  posible_bucle: "Demasiados mensajes en pocos minutos (¿otro bot?); el asistente se detuvo.",
+  reintentos_ia: "El asistente no logró responder tras varios intentos.",
+  pico_de_uso: "El asistente respondió demasiado en la última hora; se detuvo por seguridad.",
 };
 
 const WAIT_HINT_MS = 12_000;
