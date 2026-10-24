@@ -236,3 +236,15 @@ export function getSecurityEnv(): SecurityEnv {
   }
   return { trustedProxy: result.data.TRUSTED_PROXY ?? "none", rateLimitDisabled: result.data.RATE_LIMIT_DISABLED === "1" };
 }
+
+// ------------------------------------------------------- tasa BCV automática (Paso 23)
+export const RATE_SOURCE_NAMES = ["dolarapi", "bcv"] as const;
+export type RateSourceName = (typeof RATE_SOURCE_NAMES)[number];
+
+/** Fuentes de la tasa, en orden de prioridad (la siguiente se usa solo si la anterior falla). Ej.: RATE_SOURCES=dolarapi,bcv */
+export function getRateSources(): RateSourceName[] {
+  const raw = (process.env.RATE_SOURCES ?? "dolarapi,bcv").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const bad = raw.filter((s) => !(RATE_SOURCE_NAMES as readonly string[]).includes(s));
+  if (bad.length > 0 || raw.length === 0) throw new Error(`RATE_SOURCES inválido (${bad.join(", ") || "vacío"}). Opciones: ${RATE_SOURCE_NAMES.join(", ")}`);
+  return [...new Set(raw)] as RateSourceName[];
+}
