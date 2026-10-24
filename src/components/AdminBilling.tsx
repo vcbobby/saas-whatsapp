@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { amountMatches, formatBs, formatUsd } from "@/lib/billing/money";
 
-export interface BillingSettings { rate: number | null; rateAgeHours: number | null; pmBank: string; pmPhone: string; pmHolderId: string; pmHolderName: string; paypal: string; binance: string; notes: string }
+export interface RateInfo { mode: "auto" | "manual"; source: string | null; lastOkAt: string | null; lastAttemptAt: string | null; lastError: string | null; history: { rate: number; source: string; kind: "auto" | "manual" | "rejected"; note: string | null; at: string }[] }
+export interface BillingSettings { rateInfo: RateInfo; rate: number | null; rateAgeHours: number | null; pmBank: string; pmPhone: string; pmHolderId: string; pmHolderName: string; paypal: string; binance: string; notes: string }
 export interface PricedPlan { id: string; name: string; priceCents: number | null }
 interface AdminPayment {
   id: string; tenantName: string; planName: string; months: number; method: "pago_movil" | "paypal" | "binance"; amountUsdCents: number;
@@ -73,6 +74,57 @@ function Settings({ s }: { s: BillingSettings }) {
       {msg && <p className={msg.ok ? "badge" : "alert-error"} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
       <div><button type="submit" className="btn btn-primary btn-sm" disabled={busy}>{busy ? "Guardando…" : "Guardar datos de cobro"}</button></div>
     </form>
+  );
+}
+
+const KIND: Record<string, string> = { auto: "Automática", manual: "Manual", rejected: "Rechazada" };
+
+/** Tasa automática: modo, estado de la última lectura e historial. */
+function RateAuto({ info }: { info: RateInfo }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const auto = info.mode === "auto";
+  async function toggle() {
+    setBusy(true); setMsg(null);
+    const r = await post("/api/admin/rate", { mode: auto ? "manual" : "auto" });
+    setBusy(false);
+    if (!r.ok) return setMsg(r.message ?? "No se pudo cambiar.");
+    router.refresh();
+  }
+  return (
+    <section className="card-dark mt-4 grid gap-3" aria-label="Tasa automática">
+      <div>
+        <h3 className="text-lg">Tasa automática</h3>
+        <p className="muted-dark mt-1 text-sm">
+          {auto
+            ? "Activada: cada 30 minutos el sistema lee la tasa oficial y la renueva sola. Si una lectura cambia más de 15 % respecto a la anterior, no se aplica y queda en el historial para que la revises."
+            : "Apagada: la tasa solo cambia cuando tú la guardas aquí abajo. Al escribir una tasa distinta a mano, la automática se apaga para que no la pise."}
+        </p>
+      </div>
+      {auto && (
+        <p className={info.lastError ? "alert-warn" : "muted-dark text-sm"} role="status">
+          {info.lastError ? info.lastError : info.lastOkAt ? `Última lectura correcta: ${fmtDt(info.lastOkAt)}${info.source ? ` (${info.source})` : ""}.` : "Todavía no hay una lectura. Espera unos minutos (el worker debe estar encendido)."}
+          {info.lastError && info.lastOkAt ? ` Última correcta: ${fmtDt(info.lastOkAt)}.` : ""}
+        </p>
+      )}
+      <div><button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void toggle()}>{busy ? "Guardando…" : auto ? "Pasar a manual" : "Activar tasa automática"}</button></div>
+      {msg && <p className="alert-error" role="alert">{msg}</p>}
+      {info.history.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table className="w-full text-left text-sm" aria-label="Historial de la tasa">
+            <thead><tr className="muted-dark"><th className="py-1 pr-4">Fecha</th><th className="pr-4">Bs. por USD</th><th className="pr-4">Tipo</th><th className="pr-4">Fuente</th><th>Nota</th></tr></thead>
+            <tbody>
+              {info.history.slice(0, 10).map((h, i) => (
+                <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,.12)" }}>
+                  <td className="py-1 pr-4">{fmtDt(h.at)}</td><td className="pr-4">{h.rate}</td><td className="pr-4">{KIND[h.kind] ?? h.kind}</td><td className="pr-4">{h.source}</td><td>{h.note ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -208,6 +260,7 @@ export function AdminBilling({ settings, plans }: { settings: BillingSettings; p
       <h2 className="text-2xl">Cobros</h2>
       <h3 className="mt-6 text-lg">Pagos por revisar</h3>
       <Queue />
+      <RateAuto info={settings.rateInfo} />
       <Settings s={settings} />
       <Prices plans={plans} />
     </section>

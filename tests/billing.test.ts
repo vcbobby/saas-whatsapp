@@ -29,6 +29,7 @@ const planIds: string[] = [];
 let admin = "";
 let planId = "";
 let oldSettings: Record<string, unknown> = {};
+const STARTED = new Date(Date.now() - 1000);
 
 const req = (method: string, path: string, cookie?: string, body?: unknown) =>
   new Request(`${ORIGIN}${path}`, { method, headers: { origin: ORIGIN, ...(body !== undefined ? { "content-type": "application/json" } : {}), ...(cookie ? { cookie } : {}) }, body: body !== undefined ? JSON.stringify(body) : undefined });
@@ -105,6 +106,10 @@ afterAll(async () => {
   // La tasa y los datos de cobro vuelven a como estaban.
   const o = oldSettings as Record<string, unknown>;
   await owner.query("UPDATE platform_settings SET bcv_rate=$1, bcv_rate_at=$2, pm_bank=$3, pm_phone=$4, pm_holder_id=$5, pm_holder_name=$6, paypal_email=$7, binance_id=$8, notes=$9", [o.bcv_rate, o.bcv_rate_at, o.pm_bank, o.pm_phone, o.pm_holder_id, o.pm_holder_name, o.paypal_email, o.binance_id, o.notes]);
+  await owner.query("UPDATE platform_settings SET rate_mode=$1, rate_source=$2, rate_last_attempt_at=$3, rate_last_ok_at=$4, rate_last_error=$5", [o.rate_mode, o.rate_source, o.rate_last_attempt_at, o.rate_last_ok_at, o.rate_last_error]);
+  // El historial de la tasa no se borra desde la aplicación: la limpieza de pruebas levanta la protección un instante.
+  await owner.query("ALTER TABLE rate_history NO FORCE ROW LEVEL SECURITY");
+  try { await owner.query("DELETE FROM rate_history WHERE created_at >= $1", [STARTED]); } finally { await owner.query("ALTER TABLE rate_history FORCE ROW LEVEL SECURITY"); }
   if (planIds.length) await owner.query("DELETE FROM plans WHERE id = ANY($1)", [planIds]);
   await owner.end();
 });

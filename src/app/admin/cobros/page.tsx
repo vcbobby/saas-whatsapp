@@ -19,7 +19,13 @@ async function Content() {
   const auth = await requireAdminPage();
   const planRows = (await getPool().query("SELECT id, name, price_usd_cents FROM plans ORDER BY position, name")).rows;
   const st = (await getPool().query("SELECT admin_get_payment_settings($1) AS s", [auth.tokenHash])).rows[0].s as Record<string, string | number | null>;
+  const hist = (await getPool().query("SELECT * FROM admin_rate_history($1)", [auth.tokenHash])).rows;
   const billing = {
+    rateInfo: {
+      mode: (st.rate_mode === "auto" ? "auto" : "manual") as "auto" | "manual", source: st.rate_source === null || st.rate_source === undefined ? null : String(st.rate_source),
+      lastOkAt: st.rate_last_ok_at ? String(st.rate_last_ok_at) : null, lastAttemptAt: st.rate_last_attempt_at ? String(st.rate_last_attempt_at) : null, lastError: st.rate_last_error ? String(st.rate_last_error) : null,
+      history: hist.map((h) => ({ rate: Number(h.h_rate), source: String(h.h_source), kind: h.h_kind as "auto" | "manual" | "rejected", note: h.h_note ? String(h.h_note) : null, at: new Date(h.h_at).toISOString() })),
+    },
     rate: st.bcv_rate === null ? null : Number(st.bcv_rate), rateAgeHours: st.rate_age_hours === null || st.rate_age_hours === undefined ? null : Number(st.rate_age_hours),
     pmBank: String(st.pm_bank ?? ""), pmPhone: String(st.pm_phone ?? ""), pmHolderId: String(st.pm_holder_id ?? ""), pmHolderName: String(st.pm_holder_name ?? ""),
     paypal: String(st.paypal_email ?? ""), binance: String(st.binance_id ?? ""), notes: String(st.notes ?? ""),

@@ -12,6 +12,7 @@ import { deliverDue } from "@/lib/webhooks/deliver";
 import { sendDue } from "@/lib/notifications/send";
 import { tickAutomations } from "@/lib/automations/tick";
 import { purgeDueTenants } from "@/lib/privacy/deletion";
+import { refreshRate } from "@/lib/billing/rate-refresh";
 
 const handler = createInboundHandler();
 
@@ -151,6 +152,25 @@ async function purgeTenants() {
 const purgeTimer = setInterval(() => void purgeTenants(), 600_000);
 setTimeout(() => void purgeTenants(), 8_000);
 
+// Tasa BCV automática: solo actúa si el súper admin puso el modo «automático». Cada 30 min.
+let refreshingRate = false;
+async function refreshRateJob() {
+  if (refreshingRate || closing) return;
+  refreshingRate = true;
+  try {
+    const r = await refreshRate();
+    if (r.status === "ok") console.log(`[worker] tasa BCV ${r.rate} (${r.source})`);
+    else if (r.status === "rejected") console.error(`[worker] tasa BCV ${r.rate} rechazada por cambio brusco (${r.source}); el súper admin debe revisarla`);
+    else if (r.status === "failed") console.error("[worker] tasa BCV: ninguna fuente respondió bien:", r.error);
+  } catch (err) {
+    console.error("[worker] tasa BCV falló:", err instanceof Error ? err.message : err);
+  } finally {
+    refreshingRate = false;
+  }
+}
+const rateTimer = setInterval(() => void refreshRateJob(), 1_800_000);
+setTimeout(() => void refreshRateJob(), 12_000);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
@@ -163,6 +183,7 @@ async function shutdown(signal: string) {
   clearInterval(tickTimer);
   clearInterval(expireTimer);
   clearInterval(purgeTimer);
+  clearInterval(rateTimer);
   try {
     await worker.close();
     await closeProducer();
