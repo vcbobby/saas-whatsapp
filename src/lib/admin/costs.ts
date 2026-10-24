@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getPool } from "@/lib/db";
-import { getLlmEnv } from "@/lib/env";
+import { DEFAULT_AI_GLOBAL_DAILY_TOKEN_LIMIT, getLlmEnv } from "@/lib/env";
 
 const n = z.coerce.number();
 const nn = z.coerce.number().nullable();
@@ -31,7 +31,10 @@ export const budgetInputSchema = z.object({
 export type BudgetInput = z.infer<typeof budgetInputSchema>;
 
 export async function getAdminBudget(tokenHash: Buffer): Promise<AdminBudget> {
-  const r = await getPool().query("SELECT admin_ai_budget_get($1, $2) AS b", [tokenHash, getLlmEnv().AI_GLOBAL_DAILY_TOKEN_LIMIT]);
+  // Si la IA todavía no está configurada en este servidor, la pantalla igual se abre (con el tope por defecto).
+  let envLimit = DEFAULT_AI_GLOBAL_DAILY_TOKEN_LIMIT;
+  try { envLimit = getLlmEnv().AI_GLOBAL_DAILY_TOKEN_LIMIT; } catch { /* IA sin configurar */ }
+  const r = await getPool().query("SELECT admin_ai_budget_get($1, $2) AS b", [tokenHash, envLimit]);
   return budgetSchema.parse(r.rows[0].b);
 }
 

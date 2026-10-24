@@ -133,3 +133,7 @@ next-env.d.ts
 .paso22b-backup/
 
 .paso23-backup/
+
+.paso24-backup/
+.env.production
+.env.production.local

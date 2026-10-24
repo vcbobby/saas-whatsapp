@@ -55,6 +55,8 @@ export function getWhatsAppEnv() {
 
 // ---------------------------------------------------------------------- IA
 // Aparte para que solo el worker y la página del agente exijan estas variables.
+export const DEFAULT_AI_GLOBAL_DAILY_TOKEN_LIMIT = 20_000_000;
+
 const llmSchema = z
   .object({
     // "mock" no llama a ningún servicio: responde un texto fijo (solo para desarrollo).
@@ -76,7 +78,7 @@ const llmSchema = z
     AGENT_TENANT_MONTHLY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(20_000_000),
     COPILOT_TENANT_DAILY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(300_000),
     // Corte global por día (todos los negocios juntos) si en Administración no se fijó otro. Siempre activo.
-    AI_GLOBAL_DAILY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(20_000_000),
+    AI_GLOBAL_DAILY_TOKEN_LIMIT: z.coerce.number().int().min(1_000).max(1_000_000_000_000).default(DEFAULT_AI_GLOBAL_DAILY_TOKEN_LIMIT),
     // Máximo de llamadas a la IA por un mismo mensaje (los reintentos de la cola no pueden gastar sin fin).
     AGENT_MESSAGE_CALL_LIMIT: z.coerce.number().int().min(1).max(5).default(2),
     // Bucles: mensajes entrantes de una misma conversación en 10 minutos (un bot contestándole a otro bot, por ejemplo).
