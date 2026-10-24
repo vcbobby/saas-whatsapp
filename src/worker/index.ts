@@ -198,7 +198,14 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 
 const sendMode = getSendMode();
-const llmProvider = getLlmEnv().LLM_PROVIDER;
+// Sin IA configurada (por ejemplo, un servidor recién montado) el worker NO se cae: sigue con lo demás (documentos, webhooks,
+// vencimientos, tasa, eliminaciones) y el asistente simplemente no responde hasta que se configure LLM_* (falla cerrado).
+let llmProvider: string = "sin-configurar";
+try {
+  llmProvider = getLlmEnv().LLM_PROVIDER;
+} catch (err) {
+  console.error("[worker] ⚠ IA NO CONFIGURADA: el asistente no responderá hasta que se configure. Detalle:", err instanceof Error ? err.message : err);
+}
 if (sendMode === "simulate") console.warn("[worker] ⚠ MODO SIMULACIÓN: las respuestas NO se envían a WhatsApp (solo se ven en /simulador).");
 if (getEmbeddingsEnv().EMBEDDINGS_PROVIDER === "fake") console.warn("[worker] ⚠ Embeddings de prueba (fake): la búsqueda en documentos solo coincide por palabras, no por significado.");
 if (llmProvider === "mock") console.warn("[worker] ⚠ IA en modo de prueba (mock): se responde con un texto fijo, no hay modelo conectado.");

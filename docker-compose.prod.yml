@@ -1,0 +1,128 @@
+# Producción / staging en un servidor. Uso (desde la carpeta del proyecto):
+#   docker compose -f docker-compose.prod.yml --env-file .env.production <comando>
+# Lo normal es usar los scripts de deploy/ (arrancar.sh, actualizar.sh, …), que ya lo hacen por ti.
+#
+# Seguridad: NINGÚN puerto se publica en el servidor. La base de datos y Redis solo se ven dentro de la red interna de
+# Docker, y la aplicación solo es alcanzable a través del túnel de Cloudflare (que sale hacia afuera).
+name: saas
+
+x-app: &app
+  build:
+    context: .
+    # Datos de marca: se incorporan al compilar (NEXT_PUBLIC_*). Si cambias alguno, vuelve a construir (deploy/actualizar.sh).
+    args:
+      - NEXT_PUBLIC_APP_NAME
+      - NEXT_PUBLIC_APP_DOMAIN
+      - NEXT_PUBLIC_SUPPORT_EMAIL
+      - NEXT_PUBLIC_LEGAL_NAME
+      - NEXT_PUBLIC_LEGAL_ADDRESS
+      - NEXT_PUBLIC_LEGAL_COUNTRY
+      - NEXT_PUBLIC_LEGAL_REVIEWED
+  image: saas-whatsapp:local
+  env_file: .env.production
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  networks: [interna]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    env_file: .env.production
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/roles.sql:/roles/roles.sql:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    security_opt: ["no-new-privileges:true"]
+    networks: [interna]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    security_opt: ["no-new-privileges:true"]
+    networks: [interna]
+
+  # Aplica las migraciones y termina. La web y el worker esperan a que acabe bien.
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["node", "scripts/migrate.mjs"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  app:
+    <<: *app
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    <<: *app
+    command: ["npx", "tsx", "src/worker/index.ts"]
+    volumes:
+      - modelos:/models
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  # Túnel con dirección TEMPORAL y gratis (cambia cada vez que se reinicia). Perfil «rapido».
+  tunel-rapido:
+    image: cloudflare/cloudflared:latest
+    profiles: ["rapido"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--url", "http://app:3000"]
+    networks: [interna]
+    depends_on:
+      app: { condition: service_healthy }
+
+  # Túnel con dirección FIJA (necesita un dominio en Cloudflare y un token). Perfil «fijo».
+  tunel-fijo:
+    image: cloudflare/cloudflared:latest
+    profiles: ["fijo"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    networks: [interna]
+    depends_on:
+      app: { condition: service_healthy }
+
+networks:
+  interna:
+
+volumes:
+  pgdata:
+  redisdata:
+  modelos:
