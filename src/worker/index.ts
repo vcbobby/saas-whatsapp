@@ -11,6 +11,7 @@ import { indexPending } from "./kb";
 import { deliverDue } from "@/lib/webhooks/deliver";
 import { sendDue } from "@/lib/notifications/send";
 import { tickAutomations } from "@/lib/automations/tick";
+import { purgeDueTenants } from "@/lib/privacy/deletion";
 
 const handler = createInboundHandler();
 
@@ -133,6 +134,23 @@ async function expireSubs() {
 const expireTimer = setInterval(() => void expireSubs(), 600_000);
 setTimeout(() => void expireSubs(), 5_000);
 
+// Eliminación de negocios: cuando pasan los 7 días de espera se borra todo de forma definitiva. Cada 10 min.
+let purging = false;
+async function purgeTenants() {
+  if (purging || closing) return;
+  purging = true;
+  try {
+    const n = await purgeDueTenants();
+    if (n > 0) console.log(`[worker] ${n} negocio(s) eliminado(s) definitivamente`);
+  } catch (err) {
+    console.error("[worker] eliminación de negocios falló:", err instanceof Error ? err.message : err);
+  } finally {
+    purging = false;
+  }
+}
+const purgeTimer = setInterval(() => void purgeTenants(), 600_000);
+setTimeout(() => void purgeTenants(), 8_000);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
@@ -144,6 +162,7 @@ async function shutdown(signal: string) {
   clearInterval(notifyTimer);
   clearInterval(tickTimer);
   clearInterval(expireTimer);
+  clearInterval(purgeTimer);
   try {
     await worker.close();
     await closeProducer();

@@ -10,6 +10,8 @@ import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
 import { withTenant } from "@/lib/db";
 import { loadPlan } from "@/lib/plans/usage";
 import { getLegalStatus } from "@/lib/legal/consent";
+import { PrivacyPanel } from "@/components/PrivacyPanel";
+import { getDeletionStatus } from "@/lib/privacy/deletion";
 
 export const metadata: Metadata = { title: "Mi cuenta" };
 
@@ -37,6 +39,8 @@ async function AccountContent() {
     return { name: String(t.rows[0]?.name ?? ""), status: String(t.rows[0]?.status ?? ""), since: String(t.rows[0]?.since ?? ""), plan: plan?.name ?? "—" };
   });
   const legal = await getLegalStatus(session.userId).catch(() => null);
+  const isOwner = can(ctx.role, "tenant:delete") && !ctx.impersonating;
+  const deletion = isOwner ? await getDeletionStatus(ctx.tenantId).catch(() => null) : null;
   const canEdit = can(ctx.role, "settings:edit") && !ctx.impersonating;
   const since = info.since ? new Intl.DateTimeFormat("es", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${info.since}T00:00:00Z`)) : "—";
 
@@ -68,6 +72,8 @@ async function AccountContent() {
             </dl>
             <p className="mt-6"><Link href="/seguridad" className="btn btn-ghost-light">Contraseña y seguridad</Link></p>
           </section>
+
+          {isOwner && <PrivacyPanel businessName={info.name} mfaEnabled={session.mfaEnabled} scheduledFor={deletion?.scheduledFor ?? null} />}
 
           <section className="card-light" style={{ maxWidth: 640 }} aria-labelledby="acc-legal">
             <p className="eyebrow">Documentos legales</p>

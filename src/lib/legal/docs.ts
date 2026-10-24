@@ -5,7 +5,7 @@ import { brand } from "@/config/brand";
  * Antes de cobrar o de recibir clientes reales, un abogado de tu país debe revisarlos y completar lo que dice [PENDIENTE].
  * Al cambiar cualquier texto, cambia LEGAL_VERSION: así se le pide a cada persona que vuelva a aceptar.
  */
-export const LEGAL_VERSION = "2026-10-23";
+export const LEGAL_VERSION = "2026-10-23-b";
 export const LEGAL_UPDATED_LABEL = "23 de octubre de 2026";
 
 export interface LegalSection {
@@ -168,9 +168,11 @@ export function buildLegalDocs(f: LegalFacts = brandFacts()): LegalDoc[] {
         "Ningún sistema es 100 % seguro. Si ocurre un incidente que afecte tus datos, te avisaremos sin demora indebida.",
       ] },
       { id: "conservacion", heading: "6. Cuánto tiempo los conservamos", body: [
-        `Conservamos los datos mientras tu cuenta esté activa. Si la cierras o nos pides eliminarla, borramos los datos del negocio y de sus clientes en un plazo de ${pending("", "plazo, por ejemplo 30 días")}, salvo lo que debamos conservar por ley (por ejemplo, registros de pagos) o por seguridad (registros de auditoría), y copias de respaldo que se sobrescriben en su ciclo normal.`,
+        "La persona dueña del negocio puede pedir la eliminación desde «Mi cuenta → Tus datos». Hay 7 días de espera para arrepentirse; pasado ese plazo se borran de forma definitiva el negocio, sus conversaciones, contactos, citas, pedidos y las cuentas de quienes solo pertenecían a él.",
+        `Conservamos los datos mientras tu cuenta esté activa. Si la cierras o nos pides eliminarla por otra vía, borramos los datos del negocio y de sus clientes en un plazo de ${pending("", "plazo, por ejemplo 30 días")}, salvo lo que debamos conservar por ley (por ejemplo, registros de pagos) o por seguridad (registros de auditoría), y copias de respaldo que se sobrescriben en su ciclo normal.`,
       ] },
       { id: "derechos", heading: "7. Tus derechos", body: [
+        "Si eres la persona dueña de un negocio, puedes descargar todos sus datos en un archivo desde «Mi cuenta → Tus datos» cuando quieras.",
         "Puedes pedirnos acceder a tus datos, corregirlos, recibir una copia, oponerte a ciertos usos o solicitar su eliminación, en la medida que las leyes que te apliquen lo permitan. Escribe a " + MAIL + ". Responderemos en un plazo razonable y podemos pedirte confirmar tu identidad.",
         "Si eres cliente final de un negocio que usa " + N + " (escribiste por WhatsApp a ese negocio), tu solicitud sobre tus mensajes debe dirigirse primero a ese negocio, que es el responsable. Podemos ayudarlo a atenderla.",
       ] },

@@ -40,9 +40,10 @@ async function PanelContent() {
 
   const tenant = ctx
     ? await withTenant(ctx.tenantId, async (db) => {
-        const r = await db.query<{ name: string; status: string; onboarding_state: string; days_left: number | null }>(
+        const r = await db.query<{ name: string; status: string; onboarding_state: string; days_left: number | null; deletion_at: Date | null }>(
           `SELECT name, status, onboarding_state,
-                  GREATEST(0, CEIL(EXTRACT(EPOCH FROM (trial_ends_at - now())) / 86400))::int AS days_left
+                  GREATEST(0, CEIL(EXTRACT(EPOCH FROM (trial_ends_at - now())) / 86400))::int AS days_left,
+                  deletion_scheduled_for AS deletion_at
            FROM tenants`,
         );
         return r.rows[0] ?? null;
@@ -76,6 +77,12 @@ async function PanelContent() {
       />
 
       <main className="container-app flex-1 pb-24 pt-8">
+        {tenant?.deletion_at && (
+          <p className="alert-warn mb-8" role="status">
+            Este negocio está programado para eliminarse el <strong>{new Intl.DateTimeFormat("es", { dateStyle: "long" }).format(tenant.deletion_at)}</strong>.{" "}
+            {ctx && can(ctx.role, "tenant:delete") && !ctx.impersonating ? <>Si fue un error, <Link href="/cuenta" className="link">cancélalo aquí</Link>.</> : "Si fue un error, pídele a la persona dueña que lo cancele."}
+          </p>
+        )}
         {legal && !legal.upToDate && <LegalReaccept version={legal.current} first={legal.accepted === null} />}
         {!ctx || !tenant ? (
           <section className="card-light" style={{ maxWidth: 640 }}>
