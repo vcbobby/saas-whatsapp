@@ -266,9 +266,10 @@ describe("agenda: bloqueos (API)", () => {
 
   it("rechaza fechas al revés, ya pasadas, demasiado largas o mal escritas", async () => {
     const t = await register("o2");
+    const same = inDays(3); // un solo valor: dos llamadas pueden diferir 1 ms bajo carga
     for (const bad of [
       { startsAt: inDays(5), endsAt: inDays(3) },
-      { startsAt: inDays(3), endsAt: inDays(3) },
+      { startsAt: same, endsAt: same },
       { startsAt: inDays(-5), endsAt: inDays(-3) },
       { startsAt: inDays(1), endsAt: inDays(500) },
       { startsAt: "mañana", endsAt: inDays(3) },

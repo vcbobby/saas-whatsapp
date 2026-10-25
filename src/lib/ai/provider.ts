@@ -1,3 +1,13 @@
+import dns from "node:dns";
+import https from "node:https";
+
+// En WSL2 (y algunas redes) IPv6 se cuelga hasta agotar el tiempo: se prefiere IPv4.
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {
+  // Node antiguo: no pasa nada.
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -56,6 +66,40 @@ export function normalizeTurns(messages: ChatMessage[]): ChatMessage[] {
 const MAX_RESPONSE_BYTES = 200_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * `fetch` que SIEMPRE conecta por IPv4 (solo https, solo POST con texto). Es el valor por defecto de los adaptadores;
+ * las pruebas inyectan su propio `fetch` y nunca llegan aquí. No sigue redirecciones y corta respuestas gigantes.
+ */
+export const ipv4Fetch: typeof fetch = (input, init) =>
+  new Promise<Response>((resolve, reject) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : (input as Request).url);
+    if (url.protocol !== "https:") return reject(new TypeError("Solo https"));
+    const headers: Record<string, string> = {};
+    new Headers(init?.headers).forEach((v, k) => { headers[k] = v; });
+    const body = typeof init?.body === "string" ? init.body : "";
+    headers["content-length"] = String(Buffer.byteLength(body));
+    const signal = init?.signal ?? undefined;
+    if (signal?.aborted) return reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+    const req = https.request(
+      { hostname: url.hostname, port: url.port || 443, path: url.pathname + url.search, method: init?.method ?? "POST", family: 4, headers },
+      (res) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        res.on("data", (c: Buffer) => {
+          size += c.length;
+          if (size > MAX_RESPONSE_BYTES + 1) { req.destroy(); return reject(new LlmError("Respuesta del proveedor demasiado grande", false, res.statusCode)); }
+          chunks.push(c);
+        });
+        res.on("end", () => resolve(new Response(Buffer.concat(chunks), { status: res.statusCode || 500 })));
+        res.on("error", reject);
+      },
+    );
+    req.on("error", reject);
+    signal?.addEventListener("abort", () => { req.destroy(); reject(signal.reason ?? new DOMException("Aborted", "AbortError")); }, { once: true });
+    req.write(body);
+    req.end();
+  });
+
 /** POST JSON con tiempo límite, sin seguir redirecciones y con tope de tamaño de respuesta. */
 export async function postJsonLimited(
   url: string,
@@ -75,6 +119,7 @@ export async function postJsonLimited(
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     });
   } catch (err) {
+    if (err instanceof LlmError) throw err;
     const name = (err as { name?: string }).name;
     throw new LlmError(name === "TimeoutError" || name === "AbortError" ? "El proveedor de IA tardó demasiado" : "No se pudo contactar al proveedor de IA", true);
   }
