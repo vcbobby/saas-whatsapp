@@ -5,6 +5,7 @@ import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib
 import { encryptSecret } from "@/lib/crypto";
 import { withTenant } from "@/lib/db";
 import { devToolsEnabled, getSendMode } from "@/lib/env";
+import { loadAssistantBlockers } from "@/lib/agent/status";
 import { enqueueInbound } from "@/lib/queue/producer";
 import { ingestBatch } from "@/lib/whatsapp/ingest";
 
@@ -52,7 +53,8 @@ export const GET = route(async (req) => {
       messages: msgs.rows.reverse(),
     };
   });
-  return jsonResponse({ sendMode: getSendMode(), ...data });
+  const blockers = await loadAssistantBlockers(tenantId).catch(() => []);
+  return jsonResponse({ sendMode: getSendMode(), ...data, blockers });
 });
 
 export const POST = route(async (req) => {

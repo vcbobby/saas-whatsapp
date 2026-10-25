@@ -1,3 +1,4 @@
+import { AssistantStatusNotice } from "@/components/AssistantStatusNotice";
 import { SubscriptionNotice } from "@/components/SubscriptionNotice";
 import { PlanCard } from "@/components/PlanCard";
 import { Dashboard } from "@/components/Dashboard";
@@ -108,7 +109,7 @@ async function PanelContent() {
               <span className="badge">{STATUS_LABEL[tenant.status] ?? tenant.status}</span>
               {daysLeft !== null && (
                 <span className="muted-dark text-sm">
-                  {daysLeft === 1 ? "Queda 1 día de prueba" : `Quedan ${daysLeft} días de prueba`}
+                  {daysLeft === 0 ? "La prueba terminó" : daysLeft === 1 ? "Queda 1 día de prueba" : `Quedan ${daysLeft} días de prueba`}
                 </span>
               )}
             </div>
@@ -120,6 +121,9 @@ async function PanelContent() {
             )}
 
             <SubscriptionNotice tenantId={ctx.tenantId} canPay={can(ctx.role, "billing:manage") && !ctx.impersonating} />
+            <Suspense fallback={null}>
+              <AssistantStatusNotice tenantId={ctx.tenantId} exclude={["past_due", "suspended"]} />
+            </Suspense>
 
             <Dashboard />
 

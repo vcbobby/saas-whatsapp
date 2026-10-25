@@ -15,6 +15,7 @@ interface State {
   sendMode: "meta" | "simulate";
   agentEnabled: boolean;
   whatsappReady: boolean;
+  blockers?: Array<{ code: string; level: "error" | "warn"; text: string; href?: string; hrefLabel?: string }>;
   conversation: { status: string; handoffReason: string | null } | null;
   messages: Msg[];
 }
@@ -77,7 +78,8 @@ export function SimulatorChat() {
   }, [load]);
 
   const last = state?.messages[state.messages.length - 1];
-  const pendingReply = !!last && last.direction === "in" && state?.conversation?.status === "bot" && !!state?.agentEnabled;
+  const stopped = (state?.blockers ?? []).filter((b) => b.code !== "no_whatsapp" || state?.sendMode === "meta");
+  const pendingReply = !!last && last.direction === "in" && state?.conversation?.status === "bot" && !!state?.agentEnabled && stopped.length === 0;
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- el cronómetro de espera se deriva de los datos que llegan por sondeo
     setWaitingSince((prev) => (pendingReply ? (prev ?? Date.now()) : null));
@@ -128,11 +130,11 @@ export function SimulatorChat() {
         Escribe como si fueras un cliente. El mensaje pasa por la misma ruta real (base de datos, cola y asistente), pero no sale a WhatsApp.
       </p>
 
-      {state && !state.agentEnabled && (
-        <p className="alert-warn mt-4" role="status">
-          El asistente está apagado: nadie responderá. Actívalo en <a className="link" href="/agente">Asistente</a>.
+      {stopped.map((b) => (
+        <p key={b.code} className={b.level === "error" ? "alert-error mt-4" : "alert-warn mt-4"} role={b.level === "error" ? "alert" : "status"}>
+          {b.text} {b.href && <a className="link" href={b.href}>{b.hrefLabel}</a>}
         </p>
-      )}
+      ))}
       {state && state.sendMode === "meta" && (
         <p className="alert-warn mt-4" role="status">
           Atención: tu entorno está en modo <strong>meta</strong>, así que las respuestas SÍ se enviarían por WhatsApp si el número es real. Para probar sin
@@ -188,9 +190,9 @@ export function SimulatorChat() {
         {pendingReply && !slow && <p className="muted" style={{ alignSelf: "flex-start" }}>El asistente está escribiendo…</p>}
       </div>
 
-      {slow && (
+      {slow && stopped.length === 0 && (
         <p className="alert-warn mt-4" role="status">
-          Pasaron más de 12 segundos sin respuesta. Revisa que <strong>npm run worker</strong> esté corriendo (o usa <strong>npm run dev:all</strong>).
+          Pasaron más de 12 segundos sin respuesta. Revisa que <strong>npm run worker</strong> esté corriendo (o usa <strong>npm run dev:all</strong>) y mira en esa terminal las líneas que empiezan por <strong>[worker]</strong>: ahí dice por qué no respondió.
         </p>
       )}
       <div role="alert" aria-live="assertive">{error && <p className="alert-error mt-4">{error}</p>}</div>
