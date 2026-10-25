@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
 import { MAX_MINOR, MAX_STOCK } from "@/lib/catalog/money";
+import { clearStockContext, setStockContext } from "@/lib/inventory/service";
 
 const MAX_ACTIVE_PRODUCTS = 500;
 
@@ -27,10 +28,12 @@ export const POST = route(async (req) => {
     const n = await db.query("SELECT count(*)::int AS n FROM catalog_products WHERE tenant_id = $1 AND active", [tenantId]);
     if (n.rows[0].n >= MAX_ACTIVE_PRODUCTS) return "limite" as const;
     try {
+      await setStockContext(db, { kind: "edicion", userId: auth.session.userId });
       const r = await db.query(
         "INSERT INTO catalog_products (tenant_id, name, description, unit, price_minor, stock) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
         [tenantId, d.name, d.description || null, d.unit || null, d.priceMinor, d.stock ?? null],
       );
+      await clearStockContext(db);
       return r.rows[0].id as string;
     } catch (e) {
       if ((e as { code?: string }).code === "23505") return "duplicado" as const;

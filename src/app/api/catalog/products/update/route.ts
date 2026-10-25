@@ -3,6 +3,7 @@ import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
 import { MAX_MINOR, MAX_STOCK } from "@/lib/catalog/money";
+import { clearStockContext, setStockContext } from "@/lib/inventory/service";
 
 const MAX_ACTIVE_PRODUCTS = 500;
 
@@ -34,6 +35,7 @@ export const POST = route(async (req) => {
       if (n.rows[0].n >= MAX_ACTIVE_PRODUCTS) return "limite" as const;
     }
     try {
+      await setStockContext(db, { kind: "edicion", userId: auth.session.userId });
       await db.query(
         `UPDATE catalog_products SET
             name = COALESCE($3, name),
@@ -46,6 +48,7 @@ export const POST = route(async (req) => {
           WHERE tenant_id = $1 AND id = $2`,
         [tenantId, d.id, d.name ?? null, d.description !== undefined, d.description || null, d.unit !== undefined, d.unit || null, d.priceMinor ?? null, d.stock !== undefined, d.stock ?? null, d.active ?? null],
       );
+      await clearStockContext(db);
       return "ok" as const;
     } catch (e) {
       if ((e as { code?: string }).code === "23505") return "duplicado" as const;

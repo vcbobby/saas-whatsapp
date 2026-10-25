@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ModuleLocked } from "@/components/ModuleLocked";
 import { tenantHasModule } from "@/lib/plans/modules";
 import type { Metadata } from "next";
@@ -42,6 +43,7 @@ async function CatalogContent() {
         {locked ? <ModuleLocked module="catalogo" /> : (
           <>
         <p className="muted-dark mt-3 max-w-[640px]">Tus productos y precios. El asistente solo hablará de lo que esté aquí y de lo que escribiste en «Información de tu negocio».</p>
+        <p className="mt-4 text-[15px]"><Link href="/catalogo/inventario" className="link">Ir al inventario</Link> — entradas, mermas, conteos e historial de stock.</p>
         <div className="mt-10">
           <CatalogManager />
         </div>

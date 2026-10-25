@@ -127,7 +127,7 @@ export async function buildSnapshot(db: Db, tenantId: string, now: Date = new Da
       [tenantId, todayStart, todayEnd],
     );
     const low = await db.query(
-      `SELECT name, stock FROM catalog_products WHERE tenant_id = $1 AND active AND stock IS NOT NULL AND stock > 0 AND stock <= $2 ORDER BY stock, lower(name) LIMIT 10`,
+      `SELECT name, stock FROM catalog_products WHERE tenant_id = $1 AND active AND stock IS NOT NULL AND stock > 0 AND stock <= COALESCE(min_stock, $2) ORDER BY stock, lower(name) LIMIT 10`,
       [tenantId, LOW_STOCK_LIMIT],
     );
     const out = await db.query("SELECT count(*)::int AS n FROM catalog_products WHERE tenant_id = $1 AND active AND stock = 0", [tenantId]);

@@ -29,7 +29,7 @@ const MAX_PENDING_PER_CONTACT = 2;
 export const MAX_PENDING_AGENT_ORDERS = 30;
 const LOW_STOCK = 10;
 
-export interface MenuProduct { code: string; id: string; name: string; unit: string | null; priceMinor: number; stock: number | null }
+export interface MenuProduct { code: string; id: string; name: string; unit: string | null; priceMinor: number; stock: number | null; min?: number }
 export interface CatalogMenu { currency: Currency; products: MenuProduct[]; text: string }
 
 const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -46,12 +46,12 @@ const STATUS_LABEL: Record<string, string> = { pendiente: "pendiente de confirma
 
 /** Catálogo para este turno. null = el negocio no tiene productos activos: el asistente actúa como siempre. */
 export async function buildCatalogMenu(db: Db, tenantId: string, contactId: string, hints: string[]): Promise<CatalogMenu | null> {
-  const r = await db.query("SELECT id, name, unit, price_minor, stock FROM catalog_products WHERE tenant_id = $1 AND active ORDER BY lower(name) LIMIT 500", [tenantId]);
+  const r = await db.query("SELECT id, name, unit, price_minor, stock, min_stock FROM catalog_products WHERE tenant_id = $1 AND active ORDER BY lower(name) LIMIT 500", [tenantId]);
   if (r.rowCount === 0) return null;
   const cur = await db.query("SELECT currency FROM catalog_settings WHERE tenant_id = $1", [tenantId]);
   const currency: Currency = isCurrency(cur.rows[0]?.currency) ? cur.rows[0].currency : "USD";
 
-  const all = r.rows.map((p) => ({ id: p.id as string, name: cleanLabel(p.name, 120) || "Producto", unit: p.unit ? cleanLabel(p.unit, 40) : null, priceMinor: Number(p.price_minor), stock: p.stock as number | null }));
+  const all = r.rows.map((p) => ({ id: p.id as string, name: cleanLabel(p.name, 120) || "Producto", unit: p.unit ? cleanLabel(p.unit, 40) : null, priceMinor: Number(p.price_minor), stock: p.stock as number | null, min: (p.min_stock as number | null) ?? LOW_STOCK }));
   const available = rankProducts(all.filter((p) => p.stock === null || p.stock > 0), hints);
   const shown = available.slice(0, MAX_MENU_PRODUCTS);
   const soldOut = all.filter((p) => p.stock === 0).slice(0, 20);
@@ -65,7 +65,7 @@ export async function buildCatalogMenu(db: Db, tenantId: string, contactId: stri
   if (products.length === 0) lines.push("Productos disponibles: ninguno por ahora. No tomes pedidos; ofrece comunicar con una persona.");
   else {
     lines.push("Productos disponibles:");
-    for (const p of products) lines.push(`${p.code} = ${p.name}${p.unit ? ` (${p.unit})` : ""} — ${formatMoney(p.priceMinor, currency)}${p.stock !== null && p.stock <= LOW_STOCK ? ` — quedan ${p.stock}` : ""}`);
+    for (const p of products) lines.push(`${p.code} = ${p.name}${p.unit ? ` (${p.unit})` : ""} — ${formatMoney(p.priceMinor, currency)}${p.stock !== null && p.stock <= (p.min ?? LOW_STOCK) ? ` — quedan ${p.stock}` : ""}`);
     if (available.length > shown.length) lines.push(`(Hay ${available.length - shown.length} productos más que no se muestran: si el cliente pide algo que no está en la lista, pásalo a una persona.)`);
   }
   if (soldOut.length > 0) lines.push(`Agotados ahora mismo: ${soldOut.map((p) => p.name).join(", ")}.`);
