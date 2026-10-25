@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { isCurrency, type Currency } from "@/lib/catalog/money";
+import { clearStockContext, setStockContext } from "@/lib/inventory/service";
 
 type Db = Pick<PoolClient, "query">;
 
@@ -89,7 +90,11 @@ export async function createOrder(db: Db, o: OrderInput): Promise<CreateResult> 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [o.tenantId, id, l.productId, ++pos, p.name, p.unit, p.price_minor, l.quantity, Number(p.price_minor) * l.quantity, takes],
     );
-    if (takes) await db.query("UPDATE catalog_products SET stock = stock - $3, updated_at = now() WHERE tenant_id = $1 AND id = $2", [o.tenantId, l.productId, l.quantity]);
+    if (takes) {
+      await setStockContext(db, { kind: "pedido", orderId: id, userId: o.createdBy ?? null });
+      await db.query("UPDATE catalog_products SET stock = stock - $3, updated_at = now() WHERE tenant_id = $1 AND id = $2", [o.tenantId, l.productId, l.quantity]);
+      await clearStockContext(db);
+    }
   }
   return { kind: "ok", id, number, totalMinor: total };
 }
@@ -98,7 +103,7 @@ export type OrderAction = "confirm" | "deliver" | "cancel";
 export type TransitionResult = { kind: "ok" } | { kind: "no_existe" } | { kind: "estado" } | { kind: "sin_stock"; names: string[] };
 
 /** Cambia el estado de un pedido. Confirmar descuenta stock; cancelar un pedido confirmado lo devuelve. Entregado y cancelado son finales. */
-export async function transitionOrder(db: Db, tenantId: string, id: string, action: OrderAction): Promise<TransitionResult> {
+export async function transitionOrder(db: Db, tenantId: string, id: string, action: OrderAction, userId: string | null = null): Promise<TransitionResult> {
   const cur = await db.query("SELECT status FROM orders WHERE tenant_id = $1 AND id = $2 FOR UPDATE", [tenantId, id]);
   if (cur.rowCount !== 1) return { kind: "no_existe" };
   const status = cur.rows[0].status as string;
@@ -114,7 +119,9 @@ export async function transitionOrder(db: Db, tenantId: string, id: string, acti
     if (short.length > 0) return { kind: "sin_stock", names: short };
     for (const r of items.rows) {
       if (r.stock === null) continue;
+      await setStockContext(db, { kind: "pedido", orderId: id, userId });
       await db.query("UPDATE catalog_products SET stock = stock - $3, updated_at = now() WHERE tenant_id = $1 AND id = $2", [tenantId, r.product_id, r.quantity]);
+      await clearStockContext(db);
       await db.query("UPDATE order_items SET stock_taken = true WHERE tenant_id = $1 AND id = $2", [tenantId, r.id]);
     }
     await db.query("UPDATE orders SET status = 'confirmado', confirmed_at = now(), updated_at = now() WHERE tenant_id = $1 AND id = $2", [tenantId, id]);
@@ -131,7 +138,9 @@ export async function transitionOrder(db: Db, tenantId: string, id: string, acti
   if (status !== "pendiente" && status !== "confirmado") return { kind: "estado" };
   const taken = await db.query("SELECT id, product_id, quantity FROM order_items WHERE tenant_id = $1 AND order_id = $2 AND stock_taken ORDER BY product_id", [tenantId, id]);
   for (const r of taken.rows) {
+    await setStockContext(db, { kind: "devolucion", orderId: id, userId });
     await db.query("UPDATE catalog_products SET stock = LEAST(stock + $3, $4), updated_at = now() WHERE tenant_id = $1 AND id = $2 AND stock IS NOT NULL", [tenantId, r.product_id, r.quantity, MAX_STOCK]);
+    await clearStockContext(db);
     await db.query("UPDATE order_items SET stock_taken = false WHERE tenant_id = $1 AND id = $2", [tenantId, r.id]);
   }
   await db.query("UPDATE orders SET status = 'cancelado', cancelled_at = now(), updated_at = now() WHERE tenant_id = $1 AND id = $2", [tenantId, id]);

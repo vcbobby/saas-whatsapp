@@ -18,7 +18,7 @@ export const POST = route(async (req) => {
   const { id, action } = body.data;
   const out = await withTenant(tenantId, async (db) => {
     await db.query("SELECT set_config('app.actor', $1, true)", [auth.session.userId]);
-    const r = await transitionOrder(db, tenantId, id, action);
+    const r = await transitionOrder(db, tenantId, id, action, auth.session.userId);
     if (r.kind === "ok" && (action === "confirm" || action === "cancel")) {
       await db.query(
         "UPDATE work_items SET status = $3, resolved_at = now(), resolved_by = $4 WHERE tenant_id = $1 AND dedupe_key = $2 AND status IN ('abierto', 'en_proceso')",
