@@ -456,7 +456,8 @@ describe("bandeja de conversaciones: API", () => {
     const c = await customer(t, "uno", { name: "Ana" });
     await customer(t, "dos", { name: "Ana", waId: c.waId });
     await customer(t, "tres", { name: "Ana", waId: c.waId });
-    await withTenant(t.tenantId, (db) => db.query("INSERT INTO messages (tenant_id, conversation_id, direction, body, send_state, wa_message_id) VALUES ($1,$2,'out','respuesta del asistente','sent',$3)", [t.tenantId, c.conv, `wamid.out.${randomUUID()}`]));
+    await withTenant(t.tenantId, (db) => db.query(`INSERT INTO messages (tenant_id, conversation_id, direction, body, send_state, wa_message_id, received_at)
+      VALUES ($1,$2,'out','respuesta del asistente','sent',$3, (SELECT max(received_at) + interval '1 second' FROM messages WHERE conversation_id = $2))`, [t.tenantId, c.conv, `wamid.out.${randomUUID()}`]));
     await handoff(t, c.conv, "pedido_de_persona");
     const d = await (await conversationDetail(api("GET", `/api/conversations/messages?id=${c.conv}`, t.cookie))).json();
     expect(d.conversation).toMatchObject({ id: c.conv, status: "human", handoffReason: "pedido_de_persona", assignedToMe: false, contact: { name: "Ana", label: "sin_clasificar", waId: c.waId } });

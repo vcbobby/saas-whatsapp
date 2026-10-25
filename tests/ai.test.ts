@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAnthropicProvider, createGeminiProvider, createMockProvider, createOpenAiCompatibleProvider } from "@/lib/ai/adapters";
-import { LlmError, normalizeTurns } from "@/lib/ai/provider";
+import { GEMINI_THINKING_HEADROOM, createAnthropicProvider, createGeminiProvider, createMockProvider, createOpenAiCompatibleProvider } from "@/lib/ai/adapters";
+import { EventEmitter } from "node:events";
+import https from "node:https";
+import { LlmError, ipv4Fetch, normalizeTurns } from "@/lib/ai/provider";
 import { getLlmEnv } from "@/lib/env";
 import { sendText } from "@/lib/whatsapp/graph";
 import { FIXED, HANDOFF_MARKER, buildSystemPrompt, buildTurns, customerWantsHuman, parseReply } from "@/lib/agent/prompt";
@@ -48,7 +50,18 @@ describe("proveedores", () => {
     const body = JSON.parse(init.body as string);
     expect(body.systemInstruction.parts[0].text).toBe("SISTEMA");
     expect(body.contents.map((c: { role: string }) => c.role)).toEqual(["user", "model", "user"]);
-    expect(body.generationConfig.maxOutputTokens).toBe(100);
+    expect(body.generationConfig.maxOutputTokens).toBe(100 + GEMINI_THINKING_HEADROOM);
+  });
+
+  it("gemini: suma los tokens de pensamiento a la salida (se cobran) y avisa si el límite se gastó pensando", async () => {
+    const ok = vi.fn(async () => reply({ candidates: [{ content: { parts: [{ text: "Listo" }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, thoughtsTokenCount: 200 } }));
+    const r = await createGeminiProvider({ apiKey: "x".repeat(12), model: "gemini-x" }, ok as unknown as typeof fetch).generate(input);
+    expect(r.outputTokens).toBe(205);
+    const vacio = vi.fn(async () => reply({ candidates: [{ content: { parts: [] }, finishReason: "MAX_TOKENS" }], usageMetadata: { promptTokenCount: 10, thoughtsTokenCount: 600 } }));
+    await expect(createGeminiProvider({ apiKey: "x".repeat(12), model: "gemini-x" }, vacio as unknown as typeof fetch).generate(input)).rejects.toMatchObject({ name: "LlmError", retryable: false });
+    // Una respuesta vacía por otro motivo no es un error de este tipo.
+    const otro = vi.fn(async () => reply({ candidates: [{ content: { parts: [] }, finishReason: "STOP" }] }));
+    expect((await createGeminiProvider({ apiKey: "x".repeat(12), model: "gemini-x" }, otro as unknown as typeof fetch).generate(input)).text).toBe("");
   });
 
   it("gemini rechaza nombres de modelo raros (no se arma la URL con ellos)", () => {
@@ -214,5 +227,35 @@ describe("prompt", () => {
     const long = parseReply("palabra ".repeat(500));
     expect(long.text.length).toBeLessThanOrEqual(1_501);
     expect(long.text.endsWith("…")).toBe(true);
+  });
+});
+
+describe("ipv4Fetch (conexión real por IPv4, aquí con https simulado)", () => {
+  afterEach(() => vi.restoreAllMocks());
+  function fakeHttps(status: number, payload: string, seen: { opts?: https.RequestOptions; body?: string }) {
+    return vi.spyOn(https, "request").mockImplementation(((opts: https.RequestOptions, cb: (r: EventEmitter & { statusCode?: number }) => void) => {
+      seen.opts = opts;
+      const req = Object.assign(new EventEmitter(), {
+        write: (b: string) => { seen.body = b; },
+        end: () => { const res = Object.assign(new EventEmitter(), { statusCode: status }); cb(res); res.emit("data", Buffer.from(payload)); res.emit("end"); },
+        destroy: () => {},
+      });
+      return req;
+    }) as unknown as typeof https.request);
+  }
+  it("fuerza IPv4, manda cabeceras y cuerpo, y devuelve estado y texto", async () => {
+    const seen: { opts?: https.RequestOptions; body?: string } = {};
+    fakeHttps(200, '{"ok":true}', seen);
+    const r = await ipv4Fetch("https://api.ejemplo.test/v1/x?a=1", { method: "POST", headers: { "x-k": "v" }, body: '{"a":1}' });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ok: true });
+    expect(seen.opts).toMatchObject({ hostname: "api.ejemplo.test", family: 4, path: "/v1/x?a=1", method: "POST" });
+    expect((seen.opts!.headers as Record<string, string>)["x-k"]).toBe("v");
+    expect(seen.body).toBe('{"a":1}');
+  });
+  it("rechaza http (solo https) y respuestas gigantes", async () => {
+    await expect(ipv4Fetch("http://x.test/", { method: "POST", body: "" })).rejects.toThrow();
+    fakeHttps(200, "x".repeat(250_000), {});
+    await expect(ipv4Fetch("https://x.test/", { method: "POST", body: "" })).rejects.toMatchObject({ name: "LlmError", retryable: false });
   });
 });

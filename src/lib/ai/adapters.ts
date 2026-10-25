@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LlmError, normalizeTurns, postJsonLimited, statusError, type GenerateInput, type GenerateOutput, type LlmProvider } from "./provider";
+import { LlmError, ipv4Fetch, normalizeTurns, postJsonLimited, statusError, type GenerateInput, type GenerateOutput, type LlmProvider } from "./provider";
 
 type FetchImpl = typeof fetch;
 
@@ -23,11 +23,17 @@ export function createMockProvider(): LlmProvider {
 
 // ----------------------------------------------------------------- gemini
 const geminiSchema = z.looseObject({
-  candidates: z.array(z.looseObject({ content: z.looseObject({ parts: z.array(z.looseObject({ text: z.string().optional() })).optional() }).optional() })).optional(),
-  usageMetadata: z.looseObject({ promptTokenCount: z.number().optional(), candidatesTokenCount: z.number().optional() }).optional(),
+  candidates: z.array(z.looseObject({ content: z.looseObject({ parts: z.array(z.looseObject({ text: z.string().optional() })).optional() }).optional(), finishReason: z.string().optional() })).optional(),
+  usageMetadata: z.looseObject({ promptTokenCount: z.number().optional(), candidatesTokenCount: z.number().optional(), thoughtsTokenCount: z.number().optional() }).optional(),
 });
 
-export function createGeminiProvider(opts: { apiKey: string; model: string }, fetchImpl: FetchImpl = fetch): LlmProvider {
+/**
+ * Los modelos Gemini recientes «piensan» antes de responder y esos tokens cuentan dentro de maxOutputTokens (y se cobran como salida).
+ * Se deja este margen extra para que el pensamiento no se coma la respuesta; el largo de la respuesta lo controla el prompt.
+ */
+export const GEMINI_THINKING_HEADROOM = 512;
+
+export function createGeminiProvider(opts: { apiKey: string; model: string }, fetchImpl: FetchImpl = ipv4Fetch): LlmProvider {
   if (!/^[A-Za-z0-9._-]{1,100}$/.test(opts.model)) throw new Error("Nombre de modelo inválido");
   return {
     name: "gemini",
@@ -39,7 +45,7 @@ export function createGeminiProvider(opts: { apiKey: string; model: string }, fe
         {
           systemInstruction: { parts: [{ text: input.system }] },
           contents: turns.map((t) => ({ role: t.role === "user" ? "user" : "model", parts: [{ text: t.content }] })),
-          generationConfig: { maxOutputTokens: input.maxTokens, temperature: input.temperature ?? 0.4 },
+          generationConfig: { maxOutputTokens: input.maxTokens + GEMINI_THINKING_HEADROOM, temperature: input.temperature ?? 0.4 },
         },
         fetchImpl,
         input.signal,
@@ -48,7 +54,10 @@ export function createGeminiProvider(opts: { apiKey: string; model: string }, fe
       const p = geminiSchema.safeParse(json);
       if (!p.success) throw new LlmError("Respuesta de Gemini con formato inesperado", false, status);
       const text = (p.data.candidates?.[0]?.content?.parts ?? []).map((x) => x.text ?? "").join("").trim();
-      return { text, inputTokens: p.data.usageMetadata?.promptTokenCount ?? 0, outputTokens: p.data.usageMetadata?.candidatesTokenCount ?? 0, model: opts.model };
+      if (!text && p.data.candidates?.[0]?.finishReason === "MAX_TOKENS") throw new LlmError("Gemini gastó todo el límite pensando y no escribió respuesta", false, status);
+      // Los tokens de «pensamiento» se cobran como salida: se suman para que el control de costos no los pierda.
+      const u = p.data.usageMetadata;
+      return { text, inputTokens: u?.promptTokenCount ?? 0, outputTokens: (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0), model: opts.model };
     },
   };
 }
@@ -59,7 +68,7 @@ const anthropicSchema = z.looseObject({
   usage: z.looseObject({ input_tokens: z.number().optional(), output_tokens: z.number().optional() }).optional(),
 });
 
-export function createAnthropicProvider(opts: { apiKey: string; model: string }, fetchImpl: FetchImpl = fetch): LlmProvider {
+export function createAnthropicProvider(opts: { apiKey: string; model: string }, fetchImpl: FetchImpl = ipv4Fetch): LlmProvider {
   return {
     name: "anthropic",
     async generate(input) {
@@ -87,7 +96,7 @@ const openaiSchema = z.looseObject({
 });
 
 /** Sirve para OpenRouter, Groq, Mistral, DeepSeek y cualquier API con el formato "chat/completions". */
-export function createOpenAiCompatibleProvider(opts: { apiKey: string; model: string; baseUrl: string }, fetchImpl: FetchImpl = fetch): LlmProvider {
+export function createOpenAiCompatibleProvider(opts: { apiKey: string; model: string; baseUrl: string }, fetchImpl: FetchImpl = ipv4Fetch): LlmProvider {
   const base = opts.baseUrl.replace(/\/+$/, "");
   return {
     name: "openai",
