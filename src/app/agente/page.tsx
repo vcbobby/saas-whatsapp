@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AgentSettings } from "@/components/AgentSettings";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { AssistantStatusNotice } from "@/components/AssistantStatusNotice";
 import { styleFromRow } from "@/lib/agent/style";
 import { withTenant } from "@/lib/db";
 import { devToolsEnabled, getLlmEnv, getSendMode } from "@/lib/env";
@@ -55,6 +56,9 @@ async function AgentContent() {
       <main className="container-app flex-1 pb-24 pt-8">
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">Asistente</h1>
+        <Suspense fallback={null}>
+          <AssistantStatusNotice tenantId={ctx.tenantId} exclude={["disabled", "no_whatsapp"]} />
+        </Suspense>
         <div className="mt-10">
           <AgentSettings
             enabled={data.agent?.enabled ?? false}
