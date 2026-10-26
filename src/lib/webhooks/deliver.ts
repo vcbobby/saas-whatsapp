@@ -1,6 +1,8 @@
 import { brand } from "@/config/brand";
 import { decryptSecret } from "@/lib/crypto";
 import { getPool, withTenant } from "@/lib/db";
+import { type AppKind, isSealed } from "@/lib/connections/apps";
+import { buildAppRequest, friendlyAppError, openConfig } from "@/lib/connections/request";
 import { resolveTarget, type Target, type TargetCheck } from "./guard";
 import { sendWebhook, type SendResult } from "./send";
 import { signBody } from "./sign";
@@ -29,11 +31,11 @@ export async function deliverOne(tenantId: string, deliveryId: string, deps: Del
       `UPDATE webhook_deliveries d SET attempts = d.attempts + 1
          FROM webhook_endpoints e
         WHERE d.tenant_id = $1 AND d.id = $2 AND d.status = 'pendiente' AND e.tenant_id = d.tenant_id AND e.id = d.endpoint_id
-        RETURNING d.id, d.endpoint_id, d.event_id, d.event_type, d.payload, d.attempts, e.url, e.secret_enc, e.key_version, e.active`,
+        RETURNING d.id, d.endpoint_id, d.event_id, d.event_type, d.payload, d.attempts, e.url, e.secret_enc, e.key_version, e.active, e.kind, e.app_config_enc, e.app_key_version`,
       [tenantId, deliveryId],
     );
     if (r.rowCount === 0) await db.query("SELECT webhook_queue_set($1, NULL)", [deliveryId]); // ya no hay nada que enviar
-    return r.rows[0] as { endpoint_id: string; event_id: string; event_type: string; payload: unknown; attempts: number; url: string; secret_enc: string; key_version: number; active: boolean } | undefined;
+    return r.rows[0] as { endpoint_id: string; event_id: string; event_type: string; payload: unknown; attempts: number; url: string; secret_enc: string; key_version: number; active: boolean; kind: AppKind; app_config_enc: string | null; app_key_version: number | null } | undefined;
   });
   if (!loaded) return "skipped";
 
@@ -77,6 +79,20 @@ export async function deliverOne(tenantId: string, deliveryId: string, deps: Del
 
   if (!loaded.active) return finish({ ok: false, status: null, error: "La conexión está desactivada" });
   if (loaded.attempts > MAX_ATTEMPTS) return finish({ ok: false, status: null, error: "Se agotaron los intentos" });
+
+  // Conexiones a una app (Telegram, Discord, Slack): el enlace y el token salen del almacén cifrado y el mensaje se arma en español.
+  if (isSealed(loaded.kind)) {
+    let built: ReturnType<typeof buildAppRequest>;
+    try {
+      if (!loaded.app_config_enc || loaded.app_key_version === null) throw new Error("sin datos");
+      built = buildAppRequest(loaded.kind, openConfig(loaded.app_config_enc, loaded.app_key_version, tenantId, loaded.endpoint_id), loaded.event_type, loaded.payload);
+    } catch { return finish({ ok: false, status: null, error: "No se pudieron leer los datos de la conexión. Vuelve a conectar la app." }); }
+    if (!built.ok) return finish({ ok: false, status: null, error: built.reason });
+    const chk = await (deps.resolve ?? ((u: string) => resolveTarget(u)))(built.req.url);
+    if (!chk.ok) return finish({ ok: false, status: null, error: chk.reason });
+    const r = await (deps.send ?? sendWebhook)(chk.target, { ...built.req.headers, "user-agent": `${brand.name.replace(/[^\w .-]/g, "")}-Avisos/1` }, built.req.body);
+    return finish(r.ok ? r : { ...r, error: friendlyAppError(loaded.kind, r.status, r.error) });
+  }
 
   let secret: string;
   try { secret = decryptSecret(loaded.secret_enc, aadFor(tenantId, loaded.endpoint_id), loaded.key_version); }

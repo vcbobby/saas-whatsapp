@@ -683,7 +683,7 @@ describe("API de conexiones", () => {
     const list = await (await listHooks(api("GET", "/api/webhooks", t.cookie))).json();
     expect(JSON.stringify(list)).not.toContain(secret);
     expect(JSON.stringify(list)).not.toMatch(/secret/i);
-    expect(list.endpoints[0]).toMatchObject({ id, description: "Mi sistema", active: true, events: ["order.created", "appointment.created"], pending: 0 });
+    expect(list.endpoints[0]).toMatchObject({ id, description: "Mi sistema", active: true, events: ["order.created", "appointment.created"], kind: "webhook", pending: 1 /* la prueba automática al crear */ });
     const audit = await withTenant(t.tenantId, (db) => db.query("SELECT metadata FROM audit_log WHERE action = 'webhook.created'"));
     expect(audit.rows).toHaveLength(1);
     expect(JSON.stringify(audit.rows[0])).not.toContain(secret);

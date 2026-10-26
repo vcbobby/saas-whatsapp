@@ -21,8 +21,8 @@ export const STATUS_OPTIONS = {
   "order.status_changed": ["confirmado", "entregado", "cancelado"],
   "appointment.status_changed": ["confirmada", "cancelada", "completada", "no_asistio"],
 } as const;
-export const PLACEHOLDERS = ["{cliente}", "{numero}", "{servicio}", "{total}", "{estado}", "{fecha}"] as const;
-export const ACTIONS = ["tarea", "mensaje"] as const;
+export const PLACEHOLDERS = ["{cliente}", "{numero}", "{servicio}", "{total}", "{estado}", "{fecha}", "{producto}", "{stock}"] as const;
+export const ACTIONS = ["tarea", "mensaje", "app"] as const;
 /** Avisos con un cliente al que se le puede escribir (la conversación de «pasa a una persona» no). */
 export const MESSAGE_TRIGGERS = ["order.created", "order.status_changed", "appointment.created", "appointment.status_changed", "appointment.rescheduled", "appointment.upcoming", "order.pending_stale"] as const;
 
@@ -30,7 +30,8 @@ export const ruleFields = {
   name: z.string().trim().min(1, "Ponle un nombre a la regla").max(80, "Máximo 80 caracteres"),
   triggerEvent: z.enum(TRIGGERS),
   onlyStatus: z.string().trim().max(30).nullable().optional(),
-  taskTitle: z.string().trim().min(1, "Escribe el título de la tarea").max(120, "Máximo 120 caracteres"),
+  taskTitle: z.string().trim().max(120, "Máximo 120 caracteres").default(""),
+  targetEndpointId: z.uuid().nullable().optional(),
   taskPriority: z.number().int().min(1).max(3).default(2),
   offsetMinutes: z.number().int().min(1, "Mínimo 1 minuto").max(43200, "Máximo 30 días").nullable().optional(),
   actionType: z.enum(ACTIONS).default("tarea"),
@@ -53,8 +54,14 @@ export function isTimeTrigger(t: string): boolean {
 export function offsetFor(d: { triggerEvent: string; offsetMinutes?: number | null }): number | null {
   return isTimeTrigger(d.triggerEvent) ? (d.offsetMinutes ?? null) : null;
 }
-export function actionError(d: { actionType?: string; triggerEvent: string; messageTemplate?: string | null; offsetMinutes?: number | null }): string | null {
+export function actionError(d: { actionType?: string; triggerEvent: string; messageTemplate?: string | null; offsetMinutes?: number | null; taskTitle?: string; targetEndpointId?: string | null }): string | null {
   if (isTimeTrigger(d.triggerEvent) && !d.offsetMinutes) return "Indica cuántos minutos (por ejemplo 1440 para 24 horas).";
+  if (d.actionType === "app") {
+    if (!d.targetEndpointId) return "Elige a qué app conectada se enviará el aviso.";
+    if (!d.messageTemplate || !d.messageTemplate.trim()) return "Escribe el mensaje que se enviará.";
+    return null;
+  }
+  if (d.taskTitle !== undefined && !d.taskTitle.trim()) return "Escribe el título de la tarea.";
   if (d.actionType !== "mensaje") return null;
   if (!d.messageTemplate || !d.messageTemplate.trim()) return "Escribe el mensaje para el cliente.";
   if (!(MESSAGE_TRIGGERS as readonly string[]).includes(d.triggerEvent)) return "Ese aviso no tiene un cliente al que escribirle. Elige pedido o cita.";
