@@ -53,6 +53,26 @@ export function getWhatsAppEnv() {
   return result.data;
 }
 
+// ------------------------------------------- conexión de WhatsApp con un clic (Embedded Signup, Paso 29)
+/**
+ * Apagada por defecto. Se enciende SOLO cuando Meta aprobó tu app como «Tech Provider»:
+ * EMBEDDED_SIGNUP_ENABLED=true, META_APP_ID, META_ES_CONFIG_ID (el «Configuration ID» de Inicio de sesión para empresas) y WHATSAPP_APP_SECRET.
+ */
+export interface EmbeddedSignupConfig { appId: string; configId: string; appSecret: string }
+export function getEmbeddedSignupConfig(): EmbeddedSignupConfig | null {
+  if (process.env.EMBEDDED_SIGNUP_ENABLED !== "true") return null;
+  const appId = process.env.META_APP_ID?.trim() ?? "";
+  const configId = process.env.META_ES_CONFIG_ID?.trim() ?? "";
+  const appSecret = process.env.WHATSAPP_APP_SECRET?.trim() ?? "";
+  if (!/^\d{5,30}$/.test(appId) || !/^\d{5,30}$/.test(configId) || appSecret.length < 16) return null;
+  return { appId, configId, appSecret };
+}
+/** ID de la app de Meta (opcional): permite avisar cuándo vence un token temporal. */
+export function getMetaAppId(): string | null {
+  const v = process.env.META_APP_ID?.trim() ?? "";
+  return /^\d{5,30}$/.test(v) ? v : null;
+}
+
 // ---------------------------------------------------------------------- IA
 // Aparte para que solo el worker y la página del agente exijan estas variables.
 export const DEFAULT_AI_GLOBAL_DAILY_TOKEN_LIMIT = 20_000_000;

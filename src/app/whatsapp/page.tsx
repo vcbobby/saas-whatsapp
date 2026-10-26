@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { getEmbeddedSignupConfig, getWhatsAppEnv } from "@/lib/env";
 import { WhatsAppConnect } from "@/components/WhatsAppConnect";
 import { withTenant } from "@/lib/db";
 import { can } from "@/lib/auth/permissions";
@@ -28,11 +29,14 @@ async function WhatsAppContent() {
 
   // Nunca se lee la columna del secreto.
   const connected = await withTenant(ctx.tenantId, async (db) => {
-    const r = await db.query<{ external_id: string }>(
-      "SELECT external_id FROM tenant_integrations WHERE provider = 'whatsapp'",
+    const r = await db.query<{ external_id: string; connected_via: "manual" | "embedded" }>(
+      "SELECT external_id, connected_via FROM tenant_integrations WHERE provider = 'whatsapp'",
     );
-    return r.rows[0]?.external_id ?? null;
+    return r.rows[0] ?? null;
   });
+  // Conexión con un clic: solo se ofrece si está encendida en el servidor (el secreto de la app nunca sale de aquí).
+  const es = getEmbeddedSignupConfig();
+  const embedded = es ? { appId: es.appId, configId: es.configId, graphVersion: getWhatsAppEnv().WHATSAPP_GRAPH_VERSION } : null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -46,7 +50,7 @@ async function WhatsAppContent() {
         <p className="eyebrow eyebrow--dark">Tu negocio</p>
         <h1 className="mt-3 text-[32px] sm:text-[48px]">WhatsApp</h1>
         <div className="mt-10">
-          <WhatsAppConnect connectedId={connected} canManage={can(ctx.role, "integrations:manage")} />
+          <WhatsAppConnect connectedId={connected?.external_id ?? null} via={connected?.connected_via ?? null} embedded={embedded} canManage={can(ctx.role, "integrations:manage")} />
         </div>
       </main>
     </div>
