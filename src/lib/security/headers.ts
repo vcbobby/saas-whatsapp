@@ -11,19 +11,21 @@ export interface HeaderOptions {
   appEnv: string | undefined;
   /** NODE_ENV === "development": hace falta 'unsafe-eval' y WebSockets para la recarga en vivo. */
   dev: boolean;
+  /** Conexión de WhatsApp con un clic (Embedded Signup): permite el SDK y la ventana emergente de Facebook. Apagado por defecto. */
+  embeddedSignup?: boolean;
 }
 
-export function buildCsp({ appEnv, dev }: HeaderOptions): string {
+export function buildCsp({ appEnv, dev, embeddedSignup }: HeaderOptions): string {
   const hosted = appEnv === "production" || appEnv === "staging";
   const directives: string[] = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}${embeddedSignup ? " https://connect.facebook.net" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     // data: lo usa el código QR de la verificación en 2 pasos.
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self'${dev ? " ws: wss:" : ""}`,
-    "frame-src 'none'",
+    `connect-src 'self'${dev ? " ws: wss:" : ""}${embeddedSignup ? " https://graph.facebook.com https://www.facebook.com" : ""}`,
+    embeddedSignup ? "frame-src https://www.facebook.com https://web.facebook.com" : "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -42,7 +44,8 @@ export function securityHeaders(opts: HeaderOptions): Record<string, string> {
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
-    "Cross-Origin-Opener-Policy": "same-origin",
+    // La ventana de Facebook necesita poder hablar con esta página: solo con la conexión de un clic encendida.
+    "Cross-Origin-Opener-Policy": opts.embeddedSignup ? "same-origin-allow-popups" : "same-origin",
     "Cross-Origin-Resource-Policy": "same-origin",
     "X-Permitted-Cross-Domain-Policies": "none",
   };

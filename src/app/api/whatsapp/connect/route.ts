@@ -1,45 +1,35 @@
-import { encryptSecret } from "@/lib/crypto";
+import { z } from "zod";
 import { withTenant } from "@/lib/db";
 import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
-import { whatsappConnectSchema } from "@/lib/auth/validation";
-import { fetchPhoneInfo } from "@/lib/whatsapp/graph";
+import { diagnosePhone, looksLikePhoneNumber, normalizePhoneId, normalizeToken, tokenExpiry } from "@/lib/whatsapp/diagnose";
+import { saveIntegration } from "@/lib/whatsapp/integration";
 
-/** Conecta el número de WhatsApp del negocio (valida el token con Meta y lo guarda cifrado). */
+const connectSchema = z.object({ phoneNumberId: z.string().max(60), accessToken: z.string().max(3000) });
+
+/** Conecta el número de WhatsApp del negocio (valida el token con Meta, explica qué falla y lo guarda cifrado). */
 export const POST = route(async (req) => {
   const blocked = checkOrigin(req);
   if (blocked) return blocked;
   const auth = await requireTenant(req, "integrations:manage");
   if (!auth.ok) return auth.response;
-  const body = await readJson(req, whatsappConnectSchema);
+  const body = await readJson(req, connectSchema);
   if (!body.ok) return body.response;
-  const { phoneNumberId, accessToken } = body.data;
   const tenantId = auth.ctx.tenantId;
 
-  const info = await fetchPhoneInfo(phoneNumberId, accessToken);
-  if (!info) {
-    return errorResponse(
-      400,
-      "token_no_valido",
-      "Meta no aceptó ese token para ese número. Revisa el ID del número y que el token tenga permisos de WhatsApp.",
-    );
-  }
+  // La gente pega con comillas, «Bearer », espacios o el teléfono en vez del ID: se limpia y, si no sirve, se explica.
+  const phoneNumberId = normalizePhoneId(body.data.phoneNumberId);
+  const accessToken = normalizeToken(body.data.accessToken);
+  if (looksLikePhoneNumber(body.data.phoneNumberId)) return errorResponse(400, "id_es_telefono", "Eso parece un número de teléfono. Necesitas el «Phone number ID»: un código largo de solo dígitos que aparece en «Configuración de la API» de Meta, debajo del teléfono.", { fields: ["phoneNumberId"] });
+  if (!/^\d{5,30}$/.test(phoneNumberId)) return errorResponse(400, "id_no_valido", "El ID del número son solo dígitos (de 5 a 30), sin espacios ni letras.", { fields: ["phoneNumberId"] });
+  if (accessToken.length < 20) return errorResponse(400, "token_corto", "El token es demasiado corto. Cópialo completo desde Meta (empieza con EAA…).", { fields: ["accessToken"] });
 
-  // El texto cifrado queda atado a este negocio y a este número (AAD).
-  const { payload, keyVersion } = encryptSecret(accessToken, `wa:${tenantId}:${phoneNumberId}`);
+  const diag = await diagnosePhone(phoneNumberId, accessToken);
+  if (!diag.ok) return errorResponse(400, diag.reason === "token" ? "token_no_valido" : `meta_${diag.reason}`, diag.message, { fields: [diag.reason === "id" ? "phoneNumberId" : "accessToken"] });
+  const exp = await tokenExpiry(accessToken);
+
   try {
-    await withTenant(tenantId, async (db) => {
-      await db.query(
-        `INSERT INTO tenant_integrations (tenant_id, provider, external_id, secret_enc, key_version)
-         VALUES ($1, 'whatsapp', $2, $3, $4)`,
-        [tenantId, phoneNumberId, payload, keyVersion],
-      );
-      await db.query(
-        `INSERT INTO audit_log (tenant_id, actor_id, action, target_type, target_id, metadata)
-         VALUES ($1, $2, 'whatsapp.connected', 'integration', $3, $4)`,
-        [tenantId, auth.session.userId, phoneNumberId, JSON.stringify({ display: info.displayPhoneNumber })],
-      );
-    });
+    await saveIntegration({ tenantId, actorId: auth.session.userId, phoneNumberId, accessToken, display: diag.info.displayPhoneNumber, via: "manual", expiresAt: exp instanceof Date ? exp : null });
   } catch (err) {
     if ((err as { code?: string }).code === "23505") {
       return errorResponse(
@@ -50,7 +40,7 @@ export const POST = route(async (req) => {
     }
     throw err;
   }
-  return jsonResponse({ ok: true, displayPhoneNumber: info.displayPhoneNumber, verifiedName: info.verifiedName }, 201);
+  return jsonResponse({ ok: true, displayPhoneNumber: diag.info.displayPhoneNumber, verifiedName: diag.info.verifiedName, expiresAt: exp instanceof Date ? exp.toISOString() : null }, 201);
 });
 
 /** Desconecta el número del negocio. */

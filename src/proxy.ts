@@ -42,6 +42,7 @@ export async function proxy(request: NextRequest) {
   const headers = securityHeaders({
     appEnv: process.env.APP_ENV,
     dev: process.env.NODE_ENV === "development",
+    embeddedSignup: process.env.EMBEDDED_SIGNUP_ENABLED === "true",
   });
   for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
   return response;
