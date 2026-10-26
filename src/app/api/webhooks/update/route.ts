@@ -4,6 +4,7 @@ import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
 import { TEST_EVENT, WEBHOOK_EVENTS } from "@/lib/webhooks/events";
+import { checkAppUrl, isSealed, type AppKind } from "@/lib/connections/apps";
 import { resolveTarget } from "@/lib/webhooks/guard";
 import { newSecret, sealSecret } from "@/lib/webhooks/service";
 
@@ -47,8 +48,18 @@ export const POST = route(async (req) => {
     return r ? jsonResponse({ ok: true }) : errorResponse(409, "no_se_puede_reintentar", "Solo se pueden reintentar envíos fallidos de conexiones activas.");
   }
 
+  let kindOf: AppKind = "webhook";
+  if (d.action === "edit" || d.action === "rotate") {
+    const k = await withTenant(tenantId, async (db) => (await db.query("SELECT kind FROM webhook_endpoints WHERE tenant_id = $1 AND id = $2", [tenantId, d.id])).rows[0]?.kind as AppKind | undefined);
+    if (!k) return notFound();
+    kindOf = k;
+  }
+  if (d.action === "rotate" && kindOf !== "webhook") return errorResponse(409, "sin_secreto", "Esta conexión no usa secreto de firma.");
   if (d.action === "edit" && d.url !== undefined) {
-    const check = await resolveTarget(d.url);
+    if (isSealed(kindOf)) return errorResponse(422, "enlace_no_editable", "El enlace de esta app no se puede editar. Bórrala y vuelve a conectarla.", { fields: ["url"] });
+    const app = checkAppUrl(kindOf, d.url);
+    if (!app.ok) return errorResponse(422, "destino_no_permitido", app.reason, { fields: ["url"] });
+    const check = await resolveTarget(app.url);
     if (!check.ok) return errorResponse(422, "destino_no_permitido", check.reason, { fields: ["url"] });
     d.url = check.target.url.toString();
   }
