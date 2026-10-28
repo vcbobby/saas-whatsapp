@@ -5,14 +5,15 @@ import { postJson } from "@/lib/client";
 import { MESSAGE_TRIGGERS, OFFSET_LABEL, PLACEHOLDERS, STATUS_OPTIONS, TIME_TRIGGERS, TRIGGERS, TRIGGER_LABEL } from "@/lib/automations/rules";
 import { EmptyState } from "@/components/EmptyState";
 
-interface Rule { id: string; name: string; triggerEvent: string; onlyStatus: string | null; targetEndpointId: string | null; actionType: "tarea" | "mensaje" | "app"; messageTemplate: string | null; taskTitle: string; taskPriority: number; taskDueMinutes: number | null; offsetMinutes: number | null; active: boolean; runCount: number; lastRunAt: string | null }
+interface Rule { id: string; name: string; triggerEvent: string; onlyStatus: string | null; targetEndpointId: string | null; actionType: "tarea" | "mensaje" | "app"; messageTemplate: string | null; templateId: string | null; templateParams: string[]; taskTitle: string; taskPriority: number; taskDueMinutes: number | null; offsetMinutes: number | null; active: boolean; runCount: number; lastRunAt: string | null }
 interface Note { id: string; ruleName: string | null; customerName: string | null; body: string; status: "pendiente" | "enviado" | "omitido" | "fallido"; reason: string | null; attempts: number; createdAt: string }
 interface Data { max: number; rules: Rule[]; notifications: Note[] }
+interface Tpl { id: string; name: string; language: string; body: string; status: string; sendable: boolean }
 interface Conn { id: string; kind: string; description: string | null; active: boolean }
-interface Form { id: string | null; name: string; triggerEvent: string; onlyStatus: string; targetEndpointId: string; actionType: "tarea" | "mensaje" | "app"; messageTemplate: string; taskTitle: string; taskPriority: number; due: string; offset: string }
+interface Form { id: string | null; name: string; triggerEvent: string; onlyStatus: string; targetEndpointId: string; actionType: "tarea" | "mensaje" | "app"; messageTemplate: string; templateId: string; templateParams: string[]; taskTitle: string; taskPriority: number; due: string; offset: string }
 
 const PRIORITY = { 1: "Alta", 2: "Normal", 3: "Baja" } as const;
-const EMPTY: Form = { id: null, name: "", triggerEvent: "order.created", onlyStatus: "", targetEndpointId: "", actionType: "tarea", messageTemplate: "", taskTitle: "", taskPriority: 2, due: "", offset: "" };
+const EMPTY: Form = { id: null, name: "", triggerEvent: "order.created", onlyStatus: "", targetEndpointId: "", actionType: "tarea", messageTemplate: "", templateId: "", templateParams: [], taskTitle: "", taskPriority: 2, due: "", offset: "" };
 const NOTE_STATUS = { pendiente: "En cola", enviado: "Enviado", omitido: "No se envió", fallido: "Falló" } as const;
 const REASON: Record<string, string> = { sin_conversacion: "no hay conversación con el cliente", baja: "el cliente pidió no recibir avisos", limite_24h: "ya se le enviaron 5 avisos en 24 h", ventana_cerrada: "pasaron más de 24 h desde su último mensaje", sin_whatsapp: "no hay WhatsApp conectado", negocio_inactivo: "negocio inactivo", cola_llena: "demasiados avisos en cola" };
 const reasonText = (r: string | null) => (r ? REASON[r] ?? r.replace(/^[a-z_]+: /, "") : "");
@@ -40,6 +41,7 @@ export function AutomationsManager() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
   const [conns, setConns] = useState<Conn[]>([]);
+  const [tpls, setTpls] = useState<Tpl[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -49,6 +51,8 @@ export function AutomationsManager() {
       setLoadError(null); setData(j as Data);
       const c = await fetch("/api/webhooks", { cache: "no-store" }).then((x) => x.json()).catch(() => ({}));
       setConns(Array.isArray(c.endpoints) ? (c.endpoints as Conn[]) : []);
+      const t = await fetch("/api/whatsapp/templates", { cache: "no-store" }).then((x) => x.json()).catch(() => ({}));
+      setTpls(Array.isArray(t.templates) ? (t.templates as Tpl[]).filter((x) => x.status === "APPROVED" && x.sendable) : []);
     } catch { setLoadError("No hay conexión con el servidor. Revisa tu internet e intenta de nuevo."); }
   }, []);
   useEffect(() => { const t = setTimeout(() => void load(), 0); return () => clearTimeout(t); }, [load]);
@@ -65,13 +69,16 @@ export function AutomationsManager() {
     e.preventDefault();
     if (!form) return;
     const dueNum = form.due.trim() === "" ? null : Number(form.due);
-    const base = { name: form.name, triggerEvent: form.triggerEvent, onlyStatus: form.onlyStatus || null, actionType: form.actionType, targetEndpointId: form.actionType === "app" ? form.targetEndpointId || null : null, messageTemplate: form.actionType === "tarea" ? null : form.messageTemplate, taskTitle: form.taskTitle, taskPriority: form.taskPriority, taskDueMinutes: dueNum, offsetMinutes: isTime(form.triggerEvent) && form.offset.trim() !== "" ? Number(form.offset) : null };
+    const base = { name: form.name, triggerEvent: form.triggerEvent, onlyStatus: form.onlyStatus || null, actionType: form.actionType, targetEndpointId: form.actionType === "app" ? form.targetEndpointId || null : null, messageTemplate: form.actionType === "tarea" ? null : form.messageTemplate, templateId: form.actionType === "mensaje" && form.templateId ? form.templateId : null, templateParams: form.actionType === "mensaje" && form.templateId ? form.templateParams : [], taskTitle: form.taskTitle, taskPriority: form.taskPriority, taskDueMinutes: dueNum, offsetMinutes: isTime(form.triggerEvent) && form.offset.trim() !== "" ? Number(form.offset) : null };
     const ok = form.id ? await run({ action: "edit", id: form.id, ...base }) : await run(base, "/api/automations");
     if (ok) setForm(null);
   }
-  const edit = (r: Rule) => setForm({ id: r.id, name: r.name, triggerEvent: r.triggerEvent, onlyStatus: r.onlyStatus ?? "", targetEndpointId: r.targetEndpointId ?? "", actionType: r.actionType, messageTemplate: r.messageTemplate ?? "", taskTitle: r.taskTitle, taskPriority: r.taskPriority, due: r.taskDueMinutes === null ? "" : String(r.taskDueMinutes), offset: r.offsetMinutes === null ? "" : String(r.offsetMinutes) });
+  const edit = (r: Rule) => setForm({ id: r.id, name: r.name, triggerEvent: r.triggerEvent, onlyStatus: r.onlyStatus ?? "", targetEndpointId: r.targetEndpointId ?? "", actionType: r.actionType, messageTemplate: r.messageTemplate ?? "", templateId: r.templateId ?? "", templateParams: r.templateParams ?? [], taskTitle: r.taskTitle, taskPriority: r.taskPriority, due: r.taskDueMinutes === null ? "" : String(r.taskDueMinutes), offset: r.offsetMinutes === null ? "" : String(r.offsetMinutes) });
   const startRecipe = (r: (typeof RECIPES)[number]) => { const f = { ...EMPTY, ...r.form } as Form; if (f.actionType === "app" && conns.length === 1) f.targetEndpointId = conns[0]!.id; setForm(f); setError(null); };
   const connName = (id: string | null) => { const c = conns.find((x) => x.id === id); return c ? `${c.description ?? c.kind}` : null; };
+  const varCount = (id: string) => { const t = tpls.find((x) => x.id === id); return t ? new Set([...t.body.matchAll(/\{\{\s*(\d{1,2})\s*\}\}/g)].map((m) => m[1])).size : 0; };
+  const pickTemplate = (id: string) => setForm((f) => f && ({ ...f, templateId: id, templateParams: Array.from({ length: id ? varCount(id) : 0 }, (_, i) => f.templateParams[i] ?? ["{cliente}", "{servicio}", "{fecha}"][i] ?? "") }));
+  const tplName = (id: string | null) => { const t = tpls.find((x) => x.id === id); return t ? t.name : null; };
   const title = (e: string) => (TRIGGER_LABEL as Record<string, { title: string }>)[e]?.title ?? e;
 
   if (loadError) return <p className="alert-error" role="alert">{loadError}</p>;
@@ -97,6 +104,7 @@ export function AutomationsManager() {
           ) : r.actionType === "mensaje" ? (
             <>
               <p>Avisar al cliente por WhatsApp: «{r.messageTemplate}»</p>
+              {r.templateId && <p className="muted text-[14px]">Pasadas las 24 h: se envía la plantilla <strong>{tplName(r.templateId) ?? "(plantilla)"}</strong>.</p>}
               <p className="muted text-[14px]">Si no se puede (pasaron más de 24 h de su último mensaje, etc.), se crea la tarea «{r.taskTitle}» · prioridad {PRIORITY[r.taskPriority as 1 | 2 | 3]} · {dueText(r.taskDueMinutes)}</p>
             </>
           ) : (
@@ -208,6 +216,29 @@ export function AutomationsManager() {
               <label htmlFor={`${uid}-m`}>Mensaje para el cliente</label>
               <textarea id={`${uid}-m`} className="input" rows={3} required maxLength={600} value={form.messageTemplate} onChange={(e) => setForm({ ...form, messageTemplate: e.target.value })} placeholder="Ej.: Hola {cliente}, tu pedido #{numero} fue confirmado. Total: {total}." />
               <p className="hint">Solo se envía dentro de las 24 h siguientes al último mensaje del cliente (regla de WhatsApp), máximo 5 avisos por cliente al día, y no se envía a quien escriba BAJA. Puedes usar: {PLACEHOLDERS.join(" ")}</p>
+            </div>
+          )}
+          {form.actionType === "mensaje" && (
+            <div className="field">
+              <label htmlFor={`${uid}-pl`}>Si pasaron más de 24 horas (opcional)</label>
+              <select id={`${uid}-pl`} className="input" value={form.templateId} onChange={(e) => pickTemplate(e.target.value)}>
+                <option value="">No enviar: crear una tarea para avisar a mano</option>
+                {tpls.map((t) => <option key={t.id} value={t.id}>Enviar la plantilla «{t.name}» ({t.language})</option>)}
+              </select>
+              {tpls.length === 0 && <p className="hint">No tienes plantillas aprobadas. <a className="link" href="/whatsapp/plantillas">Crea una aquí</a>. Meta puede cobrar por cada plantilla enviada.</p>}
+              {form.templateId && (
+                <div className="mt-3 grid gap-3">
+                  <p className="hint">Elige qué dato va en cada hueco. Puedes usar: {PLACEHOLDERS.join(" ")} o escribir un texto fijo.</p>
+                  <p className="whitespace-pre-wrap rounded border p-3 text-sm" aria-label="Texto de la plantilla">{tpls.find((t) => t.id === form.templateId)?.body}</p>
+                  {Array.from({ length: varCount(form.templateId) }, (_, i) => (
+                    <div className="field" key={i}>
+                      <label htmlFor={`${uid}-tp${i}`}>Dato {`{{${i + 1}}}`}</label>
+                      <input id={`${uid}-tp${i}`} className="input" required maxLength={100} value={form.templateParams[i] ?? ""} onChange={(e) => setForm({ ...form, templateParams: Array.from({ length: varCount(form.templateId) }, (_, j) => (j === i ? e.target.value : form.templateParams[j] ?? "")) })} />
+                    </div>
+                  ))}
+                  <p className="hint">Con la plantilla, el aviso sale aunque el cliente no haya escrito en las últimas 24 h. Dentro de las 24 h se sigue enviando tu mensaje normal.</p>
+                </div>
+              )}
             </div>
           )}
           {form.actionType !== "app" && (<>

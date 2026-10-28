@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireTenant } from "@/lib/auth/guard";
 import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
-import { actionError, offsetFor, ruleFields, statusOk } from "@/lib/automations/rules";
+import { actionError, offsetFor, ruleFields, statusOk, templateRuleError } from "@/lib/automations/rules";
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("toggle"), id: z.uuid(), active: z.boolean() }),
@@ -26,13 +26,19 @@ export const POST = route(async (req) => {
     const aerr = actionError(d);
     if (aerr) return errorResponse(422, "accion_no_valida", aerr, { fields: ["messageTemplate"] });
   }
+  const useTpl = d.action === "edit" && d.actionType === "mensaje" && !!d.templateId;
+  if (d.action === "edit" && useTpl) {
+    const tpl = await withTenant(tenantId, async (db) => (await db.query<{ status: string; sendable: boolean; body: string }>("SELECT status, sendable, body FROM whatsapp_templates WHERE id = $1", [d.templateId])).rows[0]);
+    const terr = templateRuleError(tpl, d.templateParams);
+    if (terr) return errorResponse(422, "plantilla_no_valida", terr, { fields: ["templateId"] });
+  }
   let found: boolean;
   try { found = await withTenant(tenantId, async (db) => {
     let n = 0;
     if (d.action === "toggle") n = (await db.query("UPDATE automation_rules SET active = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2", [tenantId, d.id, d.active])).rowCount ?? 0;
     else if (d.action === "edit") n = (await db.query(
-      "UPDATE automation_rules SET name = $3, trigger_event = $4, only_status = $5, task_title = $6, task_priority = $7, task_due_minutes = $8, action_type = $9, message_template = $10, offset_minutes = $11, target_endpoint_id = $12, updated_at = now() WHERE tenant_id = $1 AND id = $2",
-      [tenantId, d.id, d.name, d.triggerEvent, d.onlyStatus || null, d.actionType === "app" ? d.name : d.taskTitle, d.taskPriority, d.taskDueMinutes ?? null, d.actionType, d.actionType === "tarea" ? null : d.messageTemplate!.trim(), offsetFor(d), d.actionType === "app" ? d.targetEndpointId : null])).rowCount ?? 0;
+      "UPDATE automation_rules SET name = $3, trigger_event = $4, only_status = $5, task_title = $6, task_priority = $7, task_due_minutes = $8, action_type = $9, message_template = $10, offset_minutes = $11, target_endpoint_id = $12, template_id = $13, template_params = $14::jsonb, updated_at = now() WHERE tenant_id = $1 AND id = $2",
+      [tenantId, d.id, d.name, d.triggerEvent, d.onlyStatus || null, d.actionType === "app" ? d.name : d.taskTitle, d.taskPriority, d.taskDueMinutes ?? null, d.actionType, d.actionType === "tarea" ? null : d.messageTemplate!.trim(), offsetFor(d), d.actionType === "app" ? d.targetEndpointId : null, useTpl ? d.templateId : null, JSON.stringify(useTpl ? d.templateParams : [])])).rowCount ?? 0;
     else n = (await db.query("DELETE FROM automation_rules WHERE tenant_id = $1 AND id = $2", [tenantId, d.id])).rowCount ?? 0;
     if (n === 1) await db.query("INSERT INTO audit_log (tenant_id, actor_id, action, target_type, metadata) VALUES ($1,$2,$3,'automation',$4)", [tenantId, actor, `automation.${d.action === "toggle" ? "toggled" : d.action === "edit" ? "updated" : "deleted"}`, JSON.stringify({ ruleId: d.id })]);
     return n === 1;
