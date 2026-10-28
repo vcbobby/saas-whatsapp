@@ -57,8 +57,8 @@ export async function sendDueEmails(max = 5, deps: SendDeps = {}): Promise<Recor
 interface Candidate { out_kind: string; out_key: string; out_tenant: string; out_tenant_name: string; out_to: string; out_info: Record<string, unknown> }
 
 /** Revisa quién debe recibir un aviso de plan o de cobro y lo encola (una sola vez por aviso gracias a la clave). Devuelve cuántos encoló. */
-export async function queuePlanNotices(): Promise<number> {
-  const rows = (await getPool().query<Candidate>("SELECT * FROM email_notice_candidates()")).rows;
+export async function queuePlanNotices(opts: { tenantId?: string } = {}): Promise<number> {
+  const rows = (await getPool().query<Candidate>("SELECT * FROM email_notice_candidates($1)", [opts.tenantId ?? null])).rows;
   let n = 0;
   for (const c of rows) {
     const plan = appLink("/plan");

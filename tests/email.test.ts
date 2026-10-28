@@ -274,11 +274,10 @@ describe("avisos de plan", () => {
   it("avisa una sola vez de una prueba por vencer", async () => {
     const o = await register("aviso");
     await ownerTenantExec(o.tenantId, "UPDATE tenants SET trial_ends_at = now() + interval '2 days' WHERE id = $1", [o.tenantId]);
-    // El tope es de 200 por vuelta: se repite hasta vaciar (en una base con muchos negocios de prueba hay más de una vuelta).
-    for (let i = 0; i < 40 && (await queuePlanNotices()) > 0; i++);
+    await queuePlanNotices({ tenantId: o.tenantId }); // solo este negocio: así la prueba no llena la cola con otros negocios
     const got = (await outbox(o.email)).filter((m) => m.template === "prueba_por_vencer");
     expect(got.length).toBe(1);
-    await queuePlanNotices();
+    await queuePlanNotices({ tenantId: o.tenantId });
     expect((await outbox(o.email)).filter((m) => m.template === "prueba_por_vencer").length).toBe(1);
   });
 });
