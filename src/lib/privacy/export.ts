@@ -38,6 +38,7 @@ export const EXPORTED_TABLES: ExportedTable[] = [
   { table: "support_messages", order: "created_at, id" },
   { table: "payments", order: "created_at, id", omit: ["proof"], restricted: true },
   { table: "customer_notifications", order: "created_at, id" },
+  { table: "whatsapp_templates", order: "created_at, id" },
   { table: "invitations", order: "created_at, id", omit: ["token_hash"], restricted: true },
   { table: "agent_usage_daily", order: "1" },
   { table: "copilot_usage_daily", order: "1" },

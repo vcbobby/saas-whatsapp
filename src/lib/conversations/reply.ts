@@ -1,6 +1,7 @@
 import { decryptSecret } from "@/lib/crypto";
 import { withTenant } from "@/lib/db";
 import { sendText, type SendResult } from "@/lib/whatsapp/graph";
+import { sendTemplate } from "@/lib/whatsapp/templates";
 
 /** WhatsApp solo permite texto libre dentro de las 24 horas siguientes al último mensaje del cliente. */
 export const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -29,6 +30,8 @@ export interface ReplyInput {
   conversationId: string;
   clientKey: string;
   text: string;
+  /** Si viene, se envía como plantilla aprobada (vale fuera de las 24 h). `text` es el texto ya armado, que se guarda en la conversación. */
+  template?: { name: string; language: string; params: string[] };
 }
 
 /** Fin de la ventana de respuesta libre (o null si el cliente nunca escribió / ya pasó). Pura: se prueba sin base de datos. */
@@ -61,7 +64,7 @@ function fromExisting(m: ExistingRow, conversationId: string): ReplyOutcome {
  *  3. Solo dentro de las 24 horas del último mensaje del cliente.
  *  4. Se anota "sending" ANTES de llamar a Meta; si no sabemos si salió, queda "unknown" y NO se reintenta solo.
  */
-export async function sendHumanReply(input: ReplyInput, deps: { send?: typeof sendText } = {}): Promise<ReplyOutcome> {
+export async function sendHumanReply(input: ReplyInput, deps: { send?: typeof sendText; sendTemplate?: typeof sendTemplate } = {}): Promise<ReplyOutcome> {
   const { tenantId, userId, conversationId, clientKey } = input;
   const text = input.text;
 
@@ -105,7 +108,8 @@ export async function sendHumanReply(input: ReplyInput, deps: { send?: typeof se
       "SELECT max(created_at) AS at FROM messages WHERE tenant_id = $1 AND conversation_id = $2 AND direction = 'in'",
       [tenantId, conversationId],
     );
-    if (!windowEnd(last.rows[0]?.at ?? null)) return { kind: "window_closed" } as const;
+    // Las plantillas aprobadas sí se pueden enviar fuera de las 24 h; el texto libre no.
+    if (!input.template && !windowEnd(last.rows[0]?.at ?? null)) return { kind: "window_closed" } as const;
 
     const i = await db.query<{ external_id: string; secret_enc: string; key_version: number }>(
       "SELECT external_id, secret_enc, key_version FROM tenant_integrations WHERE tenant_id = $1 AND provider = 'whatsapp'",
@@ -116,10 +120,10 @@ export async function sendHumanReply(input: ReplyInput, deps: { send?: typeof se
 
     const ins = await db.query<{ id: string }>(
       `INSERT INTO messages (tenant_id, conversation_id, direction, msg_type, body, send_state, sent_by, client_key)
-       VALUES ($1, $2, 'out', 'text', $3, 'sending', $4, $5)
+       VALUES ($1, $2, 'out', $6, $3, 'sending', $4, $5)
        ON CONFLICT (tenant_id, client_key) WHERE client_key IS NOT NULL DO NOTHING
        RETURNING id`,
-      [tenantId, conversationId, text, userId, clientKey],
+      [tenantId, conversationId, text, userId, clientKey, input.template ? "template" : "text"],
     );
     if (!ins.rowCount) {
       const again = await findExisting();
@@ -135,7 +139,9 @@ export async function sendHumanReply(input: ReplyInput, deps: { send?: typeof se
   let result: SendResult;
   try {
     const token = decryptSecret(prepared.secretEnc, `wa:${tenantId}:${prepared.phoneId}`, prepared.keyVersion);
-    result = await (deps.send ?? sendText)(prepared.phoneId, token, prepared.waId, text);
+    result = input.template
+      ? await (deps.sendTemplate ?? sendTemplate)(prepared.phoneId, token, prepared.waId, input.template)
+      : await (deps.send ?? sendText)(prepared.phoneId, token, prepared.waId, text);
   } catch {
     // Falló antes de hablar con Meta (p. ej. no se pudo descifrar la llave): no se envió nada.
     result = { kind: "retry", reason: "error interno antes de enviar" };
@@ -155,7 +161,20 @@ export async function sendHumanReply(input: ReplyInput, deps: { send?: typeof se
     }
     case "rejected": {
       // 131047 = pasaron más de 24 horas desde el último mensaje del cliente.
-      const message = result.code === 131047
+      const tplMsg: Record<number, string> = {
+        132001: "Meta no encuentra esa plantilla en tu cuenta (o el idioma no coincide). Actualiza la lista de plantillas.",
+        132000: "Faltan o sobran datos para llenar la plantilla.",
+        132005: "El texto de la plantilla quedó demasiado largo al llenarla.",
+        132007: "La plantilla no cumple las políticas de WhatsApp.",
+        132012: "Uno de los datos tiene un formato que Meta no acepta (sin saltos de línea ni muchos espacios).",
+        132015: "Meta pausó esa plantilla por baja calidad. Usa otra o edítala en Meta.",
+        132016: "Meta deshabilitó esa plantilla. Usa otra.",
+        131049: "Meta no entregó este mensaje de marketing para proteger la experiencia del cliente. Inténtalo más tarde o usa una plantilla de utilidad.",
+        131042: "Meta pide un método de pago en tu cuenta de WhatsApp Business para enviar plantillas. Agrégalo en Meta → Facturación.",
+      };
+      const message = input.template && result.code !== null && tplMsg[result.code]
+        ? `${tplMsg[result.code]} No se envió.`
+        : result.code === 131047
         ? "WhatsApp indica que ya pasaron más de 24 horas desde el último mensaje del cliente. El mensaje no se envió."
         : `WhatsApp rechazó el mensaje (${result.code ?? result.status}). No se envió.`;
       await finish("UPDATE messages SET send_state = 'failed', send_error = $3 WHERE tenant_id = $1 AND id = $2", [`${result.code ?? result.status}: ${result.message}`.slice(0, 300)]);
