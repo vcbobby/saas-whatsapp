@@ -2,13 +2,14 @@ import { decryptSecret } from "@/lib/crypto";
 import { getPool, withTenant } from "@/lib/db";
 import { STALE_SENDING_MS, windowEnd } from "@/lib/conversations/reply";
 import { sendText, type SendResult } from "@/lib/whatsapp/graph";
+import { sendTemplate } from "@/lib/whatsapp/templates";
 
 /** Espera (segundos) tras un fallo de conexión antes de reintentar. Máximo 3 intentos en total. */
 export const RETRY_SECONDS = [60, 300] as const;
 export const MAX_ATTEMPTS = RETRY_SECONDS.length + 1;
 const LOCK_SECONDS = 60;
 
-export interface NotifyDeps { send?: typeof sendText }
+export interface NotifyDeps { send?: typeof sendText; sendTemplate?: typeof sendTemplate }
 export type NotifyOutcome = "sent" | "retry" | "omitted" | "failed" | "skipped";
 
 /** Palabras con las que un cliente pide dejar de recibir avisos automáticos (y volver a recibirlos). Pura. */
@@ -23,6 +24,7 @@ export function optOutIntent(text: string | null | undefined): "off" | "on" | nu
 interface Loaded {
   id: string; rule_id: string; event_id: string; contact_id: string | null; conversation_id: string | null; customer_name: string | null; body: string; fallback_title: string;
   status: string; attempts: number;
+  template_name: string | null; template_language: string | null; template_params: string[] | null; template_text: string | null;
 }
 
 /** Tarea en «Hoy» para avisar a mano cuando el aviso automático no pudo salir. Misma clave que la de la base: nunca se duplica. */
@@ -37,10 +39,10 @@ async function fallbackTask(db: { query: (q: string, p: unknown[]) => Promise<un
 
 /** Envía UN aviso ya tomado de la cola. Seguro si se repite: nunca manda dos veces el mismo. */
 export async function sendOne(tenantId: string, id: string, deps: NotifyDeps = {}): Promise<NotifyOutcome> {
-  type Go = { kind: "go"; n: Loaded; messageId: string; phoneId: string; waId: string; secretEnc: string; keyVersion: number };
+  type Go = { kind: "go"; n: Loaded; viaTemplate: boolean; messageId: string; phoneId: string; waId: string; secretEnc: string; keyVersion: number };
   type Done = { kind: "done"; outcome: NotifyOutcome };
   const prepared: Go | Done = await withTenant(tenantId, async (db): Promise<Go | Done> => {
-    const q = await db.query<Loaded>("SELECT id, rule_id, event_id, contact_id, conversation_id, customer_name, body, fallback_title, status, attempts FROM customer_notifications WHERE tenant_id = $1 AND id = $2 FOR UPDATE", [tenantId, id]);
+    const q = await db.query<Loaded>("SELECT id, rule_id, event_id, contact_id, conversation_id, customer_name, body, fallback_title, status, attempts, template_name, template_language, template_params, template_text FROM customer_notifications WHERE tenant_id = $1 AND id = $2 FOR UPDATE", [tenantId, id]);
     const n = q.rows[0];
     if (!n || n.status !== "pendiente") { await db.query("SELECT notification_queue_set($1, NULL)", [id]); return { kind: "done", outcome: "skipped" }; }
 
@@ -82,20 +84,23 @@ export async function sendOne(tenantId: string, id: string, deps: NotifyDeps = {
     const active = tn?.status === "active" || (tn?.status === "trial" && (!tn.trial_ends_at || tn.trial_ends_at.getTime() > Date.now()));
     if (!active) return finish("omitido", "negocio_inactivo", false, "");
     const last = await db.query<{ at: Date | null }>("SELECT max(created_at) AS at FROM messages WHERE tenant_id = $1 AND conversation_id = $2 AND direction = 'in'", [tenantId, n.conversation_id]);
-    if (!windowEnd(last.rows[0]?.at ?? null)) return finish("omitido", "ventana_cerrada", true, "Pasaron más de 24 horas desde el último mensaje del cliente: WhatsApp no deja escribirle ahora. Avísale por otro medio.");
+    // Pasadas las 24 h solo se puede con plantilla: si la regla tiene una de respaldo se usa; si no, queda la tarea para avisar a mano.
+    const windowClosed = !windowEnd(last.rows[0]?.at ?? null);
+    const viaTemplate = windowClosed && !!n.template_name && !!n.template_language && !!n.template_text;
+    if (windowClosed && !viaTemplate) return finish("omitido", "ventana_cerrada", true, "Pasaron más de 24 horas desde el último mensaje del cliente: WhatsApp no deja escribirle ahora. Avísale por otro medio.");
     const i = await db.query<{ external_id: string; secret_enc: string; key_version: number }>("SELECT external_id, secret_enc, key_version FROM tenant_integrations WHERE tenant_id = $1 AND provider = 'whatsapp'", [tenantId]);
     if (i.rowCount !== 1) return finish("omitido", "sin_whatsapp", true, "El negocio no tiene WhatsApp conectado.");
 
     await db.query("UPDATE customer_notifications SET attempts = attempts + 1 WHERE tenant_id = $1 AND id = $2", [tenantId, id]);
     const ins = await db.query<{ id: string }>(
       `INSERT INTO messages (tenant_id, conversation_id, direction, msg_type, body, send_state, client_key)
-       VALUES ($1, $2, 'out', 'text', $3, 'sending', $4)
+       VALUES ($1, $2, 'out', $5, $3, 'sending', $4)
        ON CONFLICT (tenant_id, client_key) WHERE client_key IS NOT NULL DO NOTHING RETURNING id`,
-      [tenantId, n.conversation_id, n.body, id],
+      [tenantId, n.conversation_id, viaTemplate ? n.template_text : n.body, id, viaTemplate ? "template" : "text"],
     );
     if (!ins.rowCount) return { kind: "done", outcome: "skipped" };
     const integ = i.rows[0]!;
-    return { kind: "go", n: { ...n, attempts: n.attempts + 1 }, messageId: ins.rows[0]!.id, phoneId: integ.external_id, waId: conv.wa_id, secretEnc: integ.secret_enc, keyVersion: integ.key_version };
+    return { kind: "go", viaTemplate, n: { ...n, attempts: n.attempts + 1 }, messageId: ins.rows[0]!.id, phoneId: integ.external_id, waId: conv.wa_id, secretEnc: integ.secret_enc, keyVersion: integ.key_version };
   });
   if (prepared.kind === "done") return prepared.outcome;
   const { n } = prepared;
@@ -103,7 +108,9 @@ export async function sendOne(tenantId: string, id: string, deps: NotifyDeps = {
   let result: SendResult;
   try {
     const token = decryptSecret(prepared.secretEnc, `wa:${tenantId}:${prepared.phoneId}`, prepared.keyVersion);
-    result = await (deps.send ?? sendText)(prepared.phoneId, token, prepared.waId, n.body);
+    result = prepared.viaTemplate
+      ? await (deps.sendTemplate ?? sendTemplate)(prepared.phoneId, token, prepared.waId, { name: n.template_name!, language: n.template_language!, params: (n.template_params ?? []).map(String) })
+      : await (deps.send ?? sendText)(prepared.phoneId, token, prepared.waId, n.body);
   } catch {
     result = { kind: "retry", reason: "error interno antes de enviar" };
   }

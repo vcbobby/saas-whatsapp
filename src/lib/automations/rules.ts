@@ -36,6 +36,8 @@ export const ruleFields = {
   offsetMinutes: z.number().int().min(1, "Mínimo 1 minuto").max(43200, "Máximo 30 días").nullable().optional(),
   actionType: z.enum(ACTIONS).default("tarea"),
   messageTemplate: z.string().trim().max(600, "Máximo 600 caracteres").nullable().optional(),
+  templateId: z.uuid().nullable().optional(),
+  templateParams: z.array(z.string().trim().max(100)).max(10).default([]),
   taskDueMinutes: z.number().int().min(1, "El plazo debe ser de al menos 1 minuto").max(43200, "El plazo máximo es 30 días").nullable().optional(),
 };
 
@@ -65,5 +67,16 @@ export function actionError(d: { actionType?: string; triggerEvent: string; mess
   if (d.actionType !== "mensaje") return null;
   if (!d.messageTemplate || !d.messageTemplate.trim()) return "Escribe el mensaje para el cliente.";
   if (!(MESSAGE_TRIGGERS as readonly string[]).includes(d.triggerEvent)) return "Ese aviso no tiene un cliente al que escribirle. Elige pedido o cita.";
+  return null;
+}
+
+/** Comprueba la plantilla de respaldo de una regla de «mensaje»: aprobada, enviable y con un dato (no vacío) por cada variable. Devuelve el error o null. */
+export function templateRuleError(tpl: { status: string; sendable: boolean; body: string } | undefined, params: string[]): string | null {
+  if (!tpl) return "Esa plantilla ya no existe. Elige otra.";
+  if (tpl.status !== "APPROVED") return "Esa plantilla todavía no está aprobada por Meta.";
+  if (!tpl.sendable) return "Esa plantilla tiene encabezado, imágenes o botones con variables; por ahora solo se envían plantillas de texto.";
+  const n = new Set([...tpl.body.matchAll(/\{\{\s*(\d{1,2})\s*\}\}/g)].map((m) => m[1])).size;
+  if (params.length !== n) return n === 1 ? "Indica el dato de la plantilla." : `Indica los ${n} datos de la plantilla.`;
+  if (params.some((x) => !x.trim())) return "Ningún dato de la plantilla puede quedar vacío.";
   return null;
 }
