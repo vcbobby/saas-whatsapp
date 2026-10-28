@@ -1,5 +1,6 @@
 "use client";
 
+import { TemplateSender } from "./TemplateSender";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CONTACT_LABELS, CONTACT_LABEL_TEXT, CONVERSATION_STATUS_LABEL, MEDIA_LABEL, WORK_TYPE_LABEL, type ContactLabel, type WorkType } from "@/lib/work/labels";
@@ -411,9 +412,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
                       </div>
                     </form>
                   ) : (
-                    <p className="alert-warn mt-4" role="note">
-                      Pasaron más de 24 horas desde el último mensaje del cliente. WhatsApp solo permite texto libre dentro de ese plazo; podrás responder cuando el cliente vuelva a escribir.
-                    </p>
+                    <TemplateSender conversationId={c.id} onSent={() => void Promise.all([loadDetail(selected!), loadList()])} />
                   );
                 })()
               ) : (

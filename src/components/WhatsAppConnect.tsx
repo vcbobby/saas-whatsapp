@@ -121,6 +121,7 @@ export function WhatsAppConnect({ connectedId, canManage, embedded, via }: { con
         <p className="muted mt-3">
           ID del número: <strong>{connectedId}</strong>{via === "embedded" ? " · conectado con Facebook" : ""}. Los mensajes que lleguen a ese número aparecerán en tu panel.
         </p>
+        <p className="mt-4"><a href="/whatsapp/plantillas" className="link">Plantillas de mensaje</a> <span className="muted">(para escribirle a un cliente pasadas las 24 horas)</span></p>
         <div role="alert" aria-live="assertive">{error && <p className="alert-error mt-4">{error}</p>}</div>
         {canManage && (
           <>
