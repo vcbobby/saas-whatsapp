@@ -13,6 +13,7 @@ import { sendDue } from "@/lib/notifications/send";
 import { tickAutomations } from "@/lib/automations/tick";
 import { purgeDueTenants } from "@/lib/privacy/deletion";
 import { refreshRate } from "@/lib/billing/rate-refresh";
+import { queuePlanNotices, sendDueEmails } from "@/lib/email/outbox";
 
 const handler = createInboundHandler();
 
@@ -184,6 +185,8 @@ async function shutdown(signal: string) {
   clearInterval(expireTimer);
   clearInterval(purgeTimer);
   clearInterval(rateTimer);
+  clearInterval(mailTimer);
+  clearInterval(noticeTimer);
   try {
     await worker.close();
     await closeProducer();
@@ -210,3 +213,35 @@ if (sendMode === "simulate") console.warn("[worker] ⚠ MODO SIMULACIÓN: las re
 if (getEmbeddingsEnv().EMBEDDINGS_PROVIDER === "fake") console.warn("[worker] ⚠ Embeddings de prueba (fake): la búsqueda en documentos solo coincide por palabras, no por significado.");
 if (llmProvider === "mock") console.warn("[worker] ⚠ IA en modo de prueba (mock): se responde con un texto fijo, no hay modelo conectado.");
 console.log(`[worker] listo: escuchando la cola "${QUEUE_NAME}" (concurrencia ${CONCURRENCY})`);
+
+// Correos: envía los pendientes cada 5 s (con reintentos) y cada 10 min prepara avisos de plan/prueba y borra cuerpos viejos.
+let mailing = false;
+async function mailJob() {
+  if (mailing || closing) return;
+  mailing = true;
+  try {
+    const n = await sendDueEmails(20);
+    if (n.sent + n.failed + n.retry > 0) console.log(`[worker] correos: ${n.sent} enviado(s), ${n.retry} a reintentar, ${n.failed} fallido(s)`);
+  } catch (err) {
+    console.error("[worker] correos falló:", err instanceof Error ? err.message : err);
+  } finally {
+    mailing = false;
+  }
+}
+const mailTimer = setInterval(() => void mailJob(), 5_000);
+let noticing = false;
+async function noticeJob() {
+  if (noticing || closing) return;
+  noticing = true;
+  try {
+    const q = await queuePlanNotices();
+    if (q > 0) console.log(`[worker] ${q} aviso(s) por correo en cola`);
+    await getPool().query("SELECT email_purge()");
+  } catch (err) {
+    console.error("[worker] avisos por correo fallaron:", err instanceof Error ? err.message : err);
+  } finally {
+    noticing = false;
+  }
+}
+const noticeTimer = setInterval(() => void noticeJob(), 600_000);
+setTimeout(() => void noticeJob(), 20_000);

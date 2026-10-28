@@ -4,6 +4,7 @@ import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib
 import { hashPassword } from "@/lib/auth/password";
 import { startSession } from "@/lib/auth/session";
 import { makeSlug, signupSchema } from "@/lib/auth/validation";
+import { sendVerificationEmail } from "@/lib/email/flows";
 import { CONSENT_REQUIRED_MESSAGE, consentVersionFor } from "@/lib/legal/consent";
 
 export const POST = route(async (req) => {
@@ -24,6 +25,7 @@ export const POST = route(async (req) => {
         "SELECT * FROM auth_signup_consent($1, $2, $3, $4, $5)", // crea la cuenta y deja el consentimiento en la misma transacción
         [email, passwordHash, businessName, slug, version],
       );
+      await sendVerificationEmail(r.rows[0]!.new_user_id); // si falla, el registro sigue (hay botón para reenviar)
       const { setCookie } = await startSession(r.rows[0]!.new_user_id, req);
       return jsonResponse({ ok: true }, 201, { "Set-Cookie": setCookie });
     } catch (err) {

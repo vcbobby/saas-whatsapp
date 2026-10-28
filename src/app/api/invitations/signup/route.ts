@@ -22,6 +22,7 @@ export const POST = route(async (req) => {
       "SELECT invite_signup_consent($1, $2, $3)",
       [hashToken(body.data.token), passwordHash, version],
     );
+    await getPool().query("SELECT auth_mark_verified($1)", [r.rows[0]!.invite_signup_consent]); // el enlace llegó a su correo
     const { setCookie } = await startSession(r.rows[0]!.invite_signup_consent, req);
     return jsonResponse({ ok: true }, 201, { "Set-Cookie": setCookie });
   } catch (err) {

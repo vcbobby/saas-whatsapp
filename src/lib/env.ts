@@ -73,6 +73,35 @@ export function getMetaAppId(): string | null {
   return /^\d{5,30}$/.test(v) ? v : null;
 }
 
+// ------------------------------------------------------------------ correo (Paso 30)
+const emailSchema = z
+  .object({
+    // "dev": no envía nada; los correos quedan en la bandeja de /dev/correos y en la terminal del worker. "resend": envío real (resend.com).
+    EMAIL_PROVIDER: z.enum(["dev", "resend"]).default("dev"),
+    EMAIL_API_KEY: z.string().trim().min(10).max(300).optional(),
+    // Remitente, p. ej.:  Mi App <avisos@tudominio.com>  (el dominio debe estar verificado en el proveedor)
+    EMAIL_FROM: z.string().trim().min(5).max(200).regex(/^[^\r\n<>]*(<[^\s<>@]+@[^\s<>@]+>)?$|^[^\s<>@]+@[^\s<>@]+$/, "Formato: Nombre <correo@dominio.com>").optional(),
+    EMAIL_REPLY_TO: z.string().trim().max(200).optional(),
+    APP_ENV: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.EMAIL_PROVIDER === "resend") {
+      if (!v.EMAIL_API_KEY) ctx.addIssue({ code: "custom", path: ["EMAIL_API_KEY"], message: "Falta la clave del proveedor de correo" });
+      if (!v.EMAIL_FROM) ctx.addIssue({ code: "custom", path: ["EMAIL_FROM"], message: "Falta el remitente" });
+    }
+    if (v.EMAIL_PROVIDER === "dev" && v.APP_ENV === "production") {
+      ctx.addIssue({ code: "custom", path: ["EMAIL_PROVIDER"], message: "En producción hace falta un proveedor real de correo (EMAIL_PROVIDER=resend): con «dev» nadie recibiría los correos" });
+    }
+  });
+export function getEmailEnv() {
+  const result = emailSchema.safeParse(process.env);
+  if (!result.success) {
+    const campos = result.error.issues.map((i) => `${i.path.join(".")} (${i.message})`).join(", ");
+    throw new Error(`Configuración de correo inválida: ${campos}`);
+  }
+  return result.data;
+}
+
 // ---------------------------------------------------------------------- IA
 // Aparte para que solo el worker y la página del agente exijan estas variables.
 export const DEFAULT_AI_GLOBAL_DAILY_TOKEN_LIMIT = 20_000_000;

@@ -153,6 +153,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <p className="muted text-center text-sm">
         {mode === "login" ? (
           <>
+            <Link href="/recuperar" className="link">
+              ¿Olvidaste tu contraseña?
+            </Link>
+            <br />
             ¿Aún no tienes cuenta?{" "}
             <Link href="/registro" className="link">
               Empieza gratis
