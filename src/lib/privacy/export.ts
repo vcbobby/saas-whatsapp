@@ -55,6 +55,7 @@ export const EXCLUDED_TABLES: Record<string, string> = {
   webhook_queue: "Cola técnica interna.",
   webhook_deliveries: "Registro técnico de envíos de webhooks.",
   order_counters: "Contador interno de numeración.",
+  email_outbox: "Cola de correos que la plataforma envía (verificaciones, invitaciones, avisos). El texto se borra al enviarse.",
 };
 
 const SAFE_IDENT = /^[a-z_]+$/;

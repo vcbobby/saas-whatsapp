@@ -6,6 +6,7 @@ import { tokenHashOf } from "@/lib/auth/session";
 import { teamErrorResponse } from "@/lib/auth/team-errors";
 import { newSessionToken } from "@/lib/auth/tokens";
 import { inviteSchema } from "@/lib/auth/validation";
+import { sendInvitationEmail } from "@/lib/email/flows";
 
 export const POST = route(async (req) => {
   const blocked = checkOrigin(req);
@@ -27,5 +28,7 @@ export const POST = route(async (req) => {
     throw err;
   }
   const url = `${new URL(getEnv().APP_URL).origin}/invitacion/${token}`;
-  return jsonResponse({ ok: true, inviteUrl: url }, 201);
+  // El correo es un extra: el enlace sigue mostrándose por si el correo tarda o cae en spam.
+  const emailQueued = await sendInvitationEmail({ tenantId: auth.ctx.tenantId, to: body.data.email, role: body.data.role, url, inviter: auth.session.email });
+  return jsonResponse({ ok: true, inviteUrl: url, emailQueued }, 201);
 });

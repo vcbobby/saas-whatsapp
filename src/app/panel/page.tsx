@@ -9,11 +9,12 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
 import { LegalReaccept } from "@/components/LegalReaccept";
+import { VerifyEmailNotice } from "@/components/VerifyEmailNotice";
 import { StopImpersonationButton } from "@/components/StopImpersonationButton";
 import { getLegalStatus } from "@/lib/legal/consent";
 import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
 import { can } from "@/lib/auth/permissions";
-import { withTenant } from "@/lib/db";
+import { getPool, withTenant } from "@/lib/db";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -58,6 +59,8 @@ async function PanelContent() {
   // Si falla la consulta, la pantalla sigue funcionando (el aviso solo se omite).
   const legal = ctx?.impersonating ? null : await getLegalStatus(session.userId).catch(() => null);
 
+  const emailVerified = ctx?.impersonating ? true : await getPool().query<{ v: boolean }>("SELECT auth_email_verified($1) AS v", [session.userId]).then((r) => r.rows[0]?.v !== false).catch(() => true);
+
   return (
     <div className="flex min-h-screen flex-col">
       {ctx?.impersonating && tenant && (
@@ -84,6 +87,7 @@ async function PanelContent() {
             {ctx && can(ctx.role, "tenant:delete") && !ctx.impersonating ? <>Si fue un error, <Link href="/cuenta" className="link">cancélalo aquí</Link>.</> : "Si fue un error, pídele a la persona dueña que lo cancele."}
           </p>
         )}
+        {!emailVerified && <VerifyEmailNotice />}
         {legal && !legal.upToDate && <LegalReaccept version={legal.current} first={legal.accepted === null} />}
         {!ctx || !tenant ? (
           <section className="card-light" style={{ maxWidth: 640 }}>
