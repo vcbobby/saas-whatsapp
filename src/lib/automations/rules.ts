@@ -4,16 +4,18 @@ import { WEBHOOK_EVENTS, WEBHOOK_EVENT_LABEL } from "@/lib/webhooks/events";
 // Sin dependencias de servidor: lo usan la API y la pantalla. Debe coincidir con los CHECK de automation_rules (migración 0020).
 export const MAX_RULES = 20;
 /** Avisos por TIEMPO: no nacen de un cambio sino de que pase un plazo (necesitan «offsetMinutes»). */
-export const TIME_TRIGGERS = ["appointment.upcoming", "order.pending_stale"] as const;
+export const TIME_TRIGGERS = ["appointment.upcoming", "order.pending_stale", "conversation.unanswered"] as const;
 export const TRIGGERS = [...WEBHOOK_EVENTS, ...TIME_TRIGGERS] as const;
 export const TRIGGER_LABEL: Record<(typeof TRIGGERS)[number], { title: string; hint: string }> = {
   ...WEBHOOK_EVENT_LABEL,
   "appointment.upcoming": { title: "Falta un tiempo para una cita", hint: "Recordatorio: se activa cuando falta el tiempo que elijas para una cita pendiente o confirmada." },
   "order.pending_stale": { title: "Un pedido lleva sin confirmar un tiempo", hint: "Se activa cuando un pedido sigue pendiente pasado el tiempo que elijas." },
+  "conversation.unanswered": { title: "Un cliente lleva esperando a una persona", hint: "Se activa cuando una conversación está en manos de una persona y el cliente sigue sin respuesta pasado el tiempo que elijas." },
 };
 export const OFFSET_LABEL: Record<(typeof TIME_TRIGGERS)[number], string> = {
   "appointment.upcoming": "Minutos antes de la cita (ej.: 1440 = 24 h antes)",
   "order.pending_stale": "Minutos sin confirmar (ej.: 120 = 2 h)",
+  "conversation.unanswered": "Minutos sin respuesta (ej.: 30)",
 };
 
 /** Estados válidos para filtrar «cambia de estado». */
