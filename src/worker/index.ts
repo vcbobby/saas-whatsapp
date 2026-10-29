@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import { getPool } from "@/lib/db";
-import { getEmbeddingsEnv, getLlmEnv, getSendMode } from "@/lib/env";
+import { getEmailEnv, getEmbeddingsEnv, getLlmEnv, getSendMode } from "@/lib/env";
 import { QUEUE_NAME, createWorkerConnection, queuePrefix } from "@/lib/queue/connection";
 import { closeLockClient } from "@/lib/queue/lock";
 import { closeProducer } from "@/lib/queue/producer";
@@ -14,6 +14,7 @@ import { tickAutomations } from "@/lib/automations/tick";
 import { purgeDueTenants } from "@/lib/privacy/deletion";
 import { refreshRate } from "@/lib/billing/rate-refresh";
 import { queuePlanNotices, sendDueEmails } from "@/lib/email/outbox";
+import { HEARTBEAT_EVERY_MS, writeHeartbeat } from "@/lib/queue/heartbeat";
 
 const handler = createInboundHandler();
 
@@ -172,6 +173,11 @@ async function refreshRateJob() {
 const rateTimer = setInterval(() => void refreshRateJob(), 1_800_000);
 setTimeout(() => void refreshRateJob(), 12_000);
 
+// Latido: lo lee /api/health (con token) y deploy/estado.sh para saber que el worker está vivo.
+const beat = () => void writeHeartbeat(connection).catch((err) => console.error("[worker] latido falló:", err instanceof Error ? err.message : err));
+beat();
+const beatTimer = setInterval(beat, HEARTBEAT_EVERY_MS);
+
 let closing = false;
 async function shutdown(signal: string) {
   if (closing) return;
@@ -187,6 +193,7 @@ async function shutdown(signal: string) {
   clearInterval(rateTimer);
   clearInterval(mailTimer);
   clearInterval(noticeTimer);
+  clearInterval(beatTimer);
   try {
     await worker.close();
     await closeProducer();
@@ -212,6 +219,12 @@ try {
 if (sendMode === "simulate") console.warn("[worker] ⚠ MODO SIMULACIÓN: las respuestas NO se envían a WhatsApp (solo se ven en /simulador).");
 if (getEmbeddingsEnv().EMBEDDINGS_PROVIDER === "fake") console.warn("[worker] ⚠ Embeddings de prueba (fake): la búsqueda en documentos solo coincide por palabras, no por significado.");
 if (llmProvider === "mock") console.warn("[worker] ⚠ IA en modo de prueba (mock): se responde con un texto fijo, no hay modelo conectado.");
+try {
+  const em = getEmailEnv();
+  if (em.EMAIL_PROVIDER === "dev" && (process.env.APP_ENV === "staging")) console.warn("[worker] ⚠ CORREO EN MODO «dev» en un servidor: nadie recibirá verificaciones, recuperaciones de contraseña ni invitaciones. Configura EMAIL_PROVIDER=resend.");
+} catch (err) {
+  console.error("[worker] ⚠ Configuración de correo inválida:", err instanceof Error ? err.message : err);
+}
 console.log(`[worker] listo: escuchando la cola "${QUEUE_NAME}" (concurrencia ${CONCURRENCY})`);
 
 // Correos: envía los pendientes cada 5 s (con reintentos) y cada 10 min prepara avisos de plan/prueba y borra cuerpos viejos.

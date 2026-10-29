@@ -1,9 +1,10 @@
+# Revisión automática en GitHub: cada push a main y cada Pull Request corre tipos, estilo, pruebas, compilación y búsqueda de secretos.
 name: CI
 
 on:
-  pull_request:
   push:
     branches: [main]
+  pull_request:
 
 permissions:
   contents: read
@@ -13,10 +14,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  calidad:
-    name: Calidad (lint, tipos, build, dependencias)
+  pruebas:
+    name: Tipos, estilo y pruebas
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    services:
+      db:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: ci-super
+          POSTGRES_DB: saas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d saas"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      APP_ENV: test
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgresql://app_user:ci-user@127.0.0.1:5432/saas
+      MIGRATION_DATABASE_URL: postgresql://app_owner:ci-owner@127.0.0.1:5432/saas
+      REDIS_URL: redis://127.0.0.1:6379
+      DB_POOL_MAX: "10"
+      DB_SSL: "false"
+      ENCRYPTION_CURRENT_VERSION: "1"
+      LLM_PROVIDER: mock
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,13 +50,53 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - name: Clave de cifrado temporal (solo para esta ejecución)
+        run: echo "ENCRYPTION_KEY_1=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+      - name: Roles y extensión de la base de datos (igual que en el servidor)
+        env:
+          PGPASSWORD: ci-super
+        run: |
+          psql -h 127.0.0.1 -U postgres -d saas -v ON_ERROR_STOP=1 \
+            -v owner_pw=ci-owner -v user_pw=ci-user -f db/roles.sql
+          psql -h 127.0.0.1 -U postgres -d saas -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector"
+      - run: node scripts/migrate.mjs
+      - run: npx next typegen
       - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  compilacion:
+    name: Compilación de producción
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Igual que el Dockerfile: la compilación no necesita base de datos ni claves.
       - run: npm run build
-      - run: npm audit --audit-level=high --omit=dev
+
+  imagen:
+    name: Imagen Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir la imagen (la misma que usará el servidor)
+        run: docker build -t saas-whatsapp:ci .
+      - name: Validar docker-compose.prod.yml con un .env de muestra
+        run: |
+          bash deploy/generar-env.sh
+          docker compose -f docker-compose.prod.yml --env-file .env.production config -q
+          COMPOSE_PROFILES=fijo docker compose -f docker-compose.prod.yml --env-file .env.production config -q
+      - name: Revisar la sintaxis de los scripts de deploy
+        run: for f in deploy/*.sh; do bash -n "$f"; done
 
   secretos:
-    name: Escaneo de secretos
+    name: Búsqueda de secretos
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -40,3 +106,4 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml

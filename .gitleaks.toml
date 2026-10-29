@@ -1,0 +1,7 @@
+# Configuración de gitleaks (la usan el hook pre-commit y el CI). Extiende las reglas por defecto.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Contraseñas inventadas que las pruebas automáticas usan a propósito (no son secretos reales)"
+paths = ['''(^|/)tests/auth\.test\.ts$''']
