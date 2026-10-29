@@ -97,10 +97,4 @@ export async function listMovements(db: Db, tenantId: string, o: { productId?: s
   return r.rows.map((x) => ({ id: x.id, productId: x.product_id, productName: x.product_name, kind: x.kind, delta: x.delta, stockAfter: x.stock_after, note: x.note, orderNumber: x.order_number, actor: x.created_by ? (x.created_by === o.viewerId ? "yo" : "equipo") : "sistema", at: new Date(x.created_at).toISOString() }));
 }
 
-/** Celdas que Excel o Sheets podrían leer como fórmula se marcan con una comilla: así un nombre malicioso no ejecuta nada. */
-export function csvCell(v: unknown): string {
-  let s = v === null || v === undefined ? "" : String(v);
-  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-export const csvLine = (cells: unknown[]) => cells.map(csvCell).join(",");
+export { csvCell, csvLine } from "@/lib/csv/write";
