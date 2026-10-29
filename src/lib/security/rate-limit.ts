@@ -16,6 +16,7 @@ export const POLICIES = {
   recover: { limit: 8, windowSec: 3600 }, // pedir el enlace para recuperar la contraseña (además cada cuenta admite 3 por hora)
   verifyEmail: { limit: 15, windowSec: 3600 }, // pedir o usar enlaces de verificación de correo
   templates: { limit: 40, windowSec: 3600 }, // crear, actualizar o borrar plantillas de WhatsApp (llaman a Meta)
+  dataTransfer: { limit: 30, windowSec: 3600 }, // importar y exportar archivos (cada uno puede mover miles de filas)
   signup: { limit: 10, windowSec: 3600 }, // crear cuentas (cada cuenta nueva puede gastar IA en la prueba)
   privacy: { limit: 5, windowSec: 3600 }, // descargar o borrar todos los datos (cada intento pide la contraseña)
   support: { limit: 20, windowSec: 600 }, // crear o responder tickets de soporte

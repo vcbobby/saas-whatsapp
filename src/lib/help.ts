@@ -141,6 +141,16 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: "/equipo", label: "Gestionar el equipo" }],
   },
   {
+    id: "datos", title: "Importar y exportar", summary: "Sube tus productos desde Excel y descarga tus datos.",
+    steps: [
+      "Para importar: descarga la plantilla, llénala en Excel (Nombre y Precio son obligatorios) y guárdala como CSV.",
+      "Al subirla ves una vista previa con lo que se creará, lo que se actualizará y las filas con error; recién al confirmar se cambia algo.",
+      "Un producto que ya existe se actualiza solo con las columnas que llenes: una celda vacía no borra nada, y la importación nunca borra productos.",
+      "Para exportar: elige clientes, pedidos, citas o productos. Si en Excel todo queda en una sola columna, descarga el otro formato.",
+    ],
+    links: [{ href: "/datos", label: "Importar y exportar" }],
+  },
+  {
     id: "plan", title: "Plan y pagos", summary: "Tu plan, lo que incluye y cómo pagarlo.",
     steps: [
       "Aquí ves cuánto has usado de tu plan este mes y hasta cuándo está vigente.",
@@ -200,7 +210,7 @@ export function topicForPath(pathname: string): HelpTopic | null {
   const map: Record<string, string> = {
     "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
-    "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
+    "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/datos": "datos", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
   };
   const id = map[seg];
   return id ? (HELP_TOPICS.find((t) => t.id === id) ?? null) : null;

@@ -44,6 +44,7 @@ async function CatalogContent() {
           <>
         <p className="muted-dark mt-3 max-w-[640px]">Tus productos y precios. El asistente solo hablará de lo que esté aquí y de lo que escribiste en «Información de tu negocio».</p>
         <p className="mt-4 text-[15px]"><Link href="/catalogo/inventario" className="link">Ir al inventario</Link> — entradas, mermas, conteos e historial de stock.</p>
+        <p className="mt-2 text-[15px]"><Link href="/datos" className="link">Importar productos desde Excel</Link> — o descarga tus productos para editarlos en una hoja de cálculo.</p>
         <div className="mt-10">
           <CatalogManager />
         </div>

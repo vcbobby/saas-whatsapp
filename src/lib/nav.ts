@@ -88,6 +88,7 @@ export function buildNav(i: NavInput): NavGroup[] {
   if (i.hasTenant) account.push({ href: "/cuenta", label: "Mi cuenta", hint: "Tu negocio y tu perfil", icon: "user" });
   if (i.hasTenant && i.canManage) account.push({ href: "/soporte", label: "Soporte", hint: "Escríbenos y te respondemos", icon: "mail" });
   if (i.hasTenant && i.canManage) account.push({ href: "/equipo", label: "Equipo", hint: "Personas y permisos", icon: "users" });
+  if (i.hasTenant && i.canManage) account.push({ href: "/datos", label: "Importar y exportar", hint: "Archivos de Excel (CSV)", icon: "store" });
   if (i.hasTenant && i.canPay) account.push({ href: "/plan", label: "Plan y pagos", hint: "Tu plan y su vencimiento", icon: "card" });
   account.push({ href: "/seguridad", label: "Seguridad", hint: "Contraseña y verificación", icon: "shield" });
   if (i.isSuperAdmin) {
