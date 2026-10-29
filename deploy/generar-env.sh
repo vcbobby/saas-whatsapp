@@ -8,7 +8,7 @@ FILE=".env.production"
 command -v openssl >/dev/null || { echo "✖ Falta openssl (apt-get install -y openssl)"; exit 1; }
 
 PG=$(openssl rand -hex 24); OWNER=$(openssl rand -hex 24); APPPW=$(openssl rand -hex 24)
-RD=$(openssl rand -hex 24); KEY=$(openssl rand -base64 32); VERIFY=$(openssl rand -hex 24)
+RD=$(openssl rand -hex 24); HEALTH=$(openssl rand -hex 24); KEY=$(openssl rand -base64 32); VERIFY=$(openssl rand -hex 24)
 
 umask 077
 cat > "$FILE" <<EOT
@@ -47,6 +47,22 @@ KB_MODEL_DIR=/models
 # WhatsApp (Meta). El token de verificación ya está generado; pégalo en Meta al registrar el webhook.
 WHATSAPP_VERIFY_TOKEN=$VERIFY
 # WHATSAPP_APP_SECRET=   (Meta → Configuración de la app → Básica → Clave secreta)
+
+# Correo (verificación de cuenta, recuperar contraseña, invitaciones, avisos de plan). Con «dev» NADIE recibe correos:
+# para testers reales necesitas resend.com + un dominio verificado (guía: deploy/LEEME-SERVIDOR.md, sección «Correo»).
+EMAIL_PROVIDER=dev
+# EMAIL_API_KEY=
+# EMAIL_FROM=Mi App <avisos@tudominio.com>
+# EMAIL_REPLY_TO=
+
+# Clave para ver el detalle de salud (web, base de datos, Redis y worker): la usa deploy/estado.sh y puedes ponerla en un monitor
+# (cabecera «x-health-token»). Sin ella, /api/health solo dice ok o degraded.
+HEALTH_TOKEN=$HEALTH
+
+# Registro de WhatsApp dentro de la app (Inicio de sesión para empresas). Déjalo apagado hasta tener ese acceso en Meta.
+# EMBEDDED_SIGNUP_ENABLED=true
+# META_APP_ID=
+# META_ES_CONFIG_ID=
 
 # IA real (paso 25). Hasta entonces el asistente NO responde en el servidor (el modo de prueba no se permite fuera de tu PC).
 # LLM_PROVIDER=gemini
