@@ -3,6 +3,7 @@ import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib
 import { burnPasswordCheck, verifyPassword } from "@/lib/auth/password";
 import { startSession } from "@/lib/auth/session";
 import { loginSchema } from "@/lib/auth/validation";
+import { notifyLoginDevice } from "@/lib/email/flows";
 
 const GENERIC = "Correo o contraseña incorrectos, o la cuenta está bloqueada temporalmente.";
 
@@ -39,6 +40,8 @@ export const POST = route(async (req) => {
 
   await pool.query("SELECT auth_login_ok($1)", [user.uid]);
   const { setCookie, pending } = await startSession(user.uid, req);
+  // Sin 2FA el inicio de sesión ya está completo: se avisa si es un dispositivo nuevo. Con 2FA se avisa al verificar el código.
+  if (!pending) await notifyLoginDevice(user.uid, req);
   // Con 2FA activado la contraseña sola no basta: la sesión queda "pendiente" 10 min.
   return jsonResponse({ ok: true, mfaRequired: pending }, 200, { "Set-Cookie": setCookie });
 }, { limit: "login" });

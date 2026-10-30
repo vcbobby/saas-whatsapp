@@ -4,7 +4,7 @@ import { useId, useState, type FormEvent } from "react";
 import { postJson } from "@/lib/client";
 
 /** Cambiar la contraseña: pide la actual y cierra la sesión en los demás dispositivos. */
-export function PasswordForm() {
+export function PasswordForm({ mfaEnabled = false }: { mfaEnabled?: boolean }) {
   const uid = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,11 +18,12 @@ export function PasswordForm() {
     const current = String(f.get("current") ?? "");
     const next = String(f.get("next") ?? "");
     const again = String(f.get("again") ?? "");
+    const code = String(f.get("code") ?? "").replace(/\s/g, "");
     setDone(null);
     if (next !== again) return setError("Las dos contraseñas nuevas no coinciden.");
     setBusy(true);
     setError(null);
-    const r = await postJson<{ otherSessionsClosed?: number }>("/api/account/password", { currentPassword: current, newPassword: next });
+    const r = await postJson<{ otherSessionsClosed?: number }>("/api/account/password", { currentPassword: current, newPassword: next, ...(mfaEnabled ? { code } : {}) });
     setBusy(false);
     if (!r.ok) return setError(r.data.message ?? "No se pudo cambiar la contraseña.");
     form.reset();
@@ -38,6 +39,9 @@ export function PasswordForm() {
         <div className="field"><label htmlFor={`${uid}-c`}>Contraseña actual</label><input id={`${uid}-c`} name="current" type="password" className="input" autoComplete="current-password" required maxLength={128} /></div>
         <div className="field"><label htmlFor={`${uid}-n`}>Contraseña nueva</label><input id={`${uid}-n`} name="next" type="password" className="input" autoComplete="new-password" required minLength={10} maxLength={128} /><p className="hint">Mínimo 10 caracteres. No uses tu correo.</p></div>
         <div className="field"><label htmlFor={`${uid}-a`}>Repite la contraseña nueva</label><input id={`${uid}-a`} name="again" type="password" className="input" autoComplete="new-password" required maxLength={128} /></div>
+        {mfaEnabled && (
+          <div className="field"><label htmlFor={`${uid}-k`}>Código de verificación</label><input id={`${uid}-k`} name="code" className="input" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" maxLength={7} required /><p className="hint">Los 6 dígitos de tu app de verificación (Google Authenticator, etc.).</p></div>
+        )}
         {error && <p className="alert-error" role="alert">{error}</p>}
         {done !== null && <p className="alert-ok" role="status">Contraseña cambiada.{done > 0 ? ` Cerramos ${done === 1 ? "1 sesión" : `${done} sesiones`} en otros dispositivos.` : ""}</p>}
         <div><button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Guardando…" : "Cambiar contraseña"}</button></div>

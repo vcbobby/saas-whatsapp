@@ -185,13 +185,13 @@ async function makeSuperAdmin(name: string) {
   const res = await loginAs(addr, PASSWORD);
   const ver = await verify2fa(api("POST", "/api/auth/2fa/verify", cookieOf(res), { code: codeFor(secret) }));
   expect(ver.status).toBe(200);
-  return { cookie: cookieOf(ver), email: addr };
+  return { cookie: cookieOf(ver), email: addr, secret };
 }
 
 describe("súper admin", () => {
   it("puede cambiar su propia contraseña (sin negocio activo no hay registro de negocio)", async () => {
     const admin = await makeSuperAdmin("sa1");
-    const res = await pw(admin.cookie, { currentPassword: PASSWORD, newPassword: ADMIN_PASSWORD });
+    const res = await pw(admin.cookie, { currentPassword: PASSWORD, newPassword: ADMIN_PASSWORD, code: codeFor(admin.secret, 1) });
     expect(res.status).toBe(200);
     expect((await loginAs(admin.email, ADMIN_PASSWORD)).status).toBe(200);
   });
