@@ -1,5 +1,7 @@
 import { newSessionToken } from "@/lib/auth/tokens";
 import { getPool, withTenant } from "@/lib/db";
+import { clientIp } from "@/lib/security/client-ip";
+import { describeDevice } from "@/lib/security/device";
 import { appLink, enqueueEmail } from "./outbox";
 import { emailTemplates } from "./templates";
 
@@ -40,5 +42,24 @@ export async function sendInvitationEmail(o: { tenantId: string; to: string; rol
   } catch (err) {
     console.error("[correo] invitación:", err instanceof Error ? err.message : err);
     return false;
+  }
+}
+
+/**
+ * Avisa por correo cuando alguien completa un inicio de sesión desde un navegador o sistema que esa persona nunca había usado.
+ * Se llama SOLO con el inicio de sesión ya completo (contraseña y, si lo tiene, código): así quien solo conoce la contraseña
+ * no puede llenar tu bandeja. Un aviso por hora como máximo. Nunca falla ni retrasa el inicio de sesión.
+ */
+export async function notifyLoginDevice(userId: string, req: Request): Promise<void> {
+  try {
+    const device = describeDevice(req.headers.get("user-agent"));
+    const ip = clientIp(req);
+    const r = await getPool().query<{ is_new: boolean; user_email: string | null }>("SELECT * FROM login_device_seen($1, $2, $3, $4)", [userId, device.hash, device.label, ip]);
+    const row = r.rows[0];
+    if (!row?.is_new || !row.user_email) return;
+    const hour = new Date().toISOString().slice(0, 13);
+    await enqueueEmail(row.user_email, emailTemplates.newDevice({ device: device.label, ip, when: new Date() }), { dedupeKey: `nuevo-dispositivo:${userId}:${hour}` });
+  } catch (err) {
+    console.error("[correo] aviso de dispositivo nuevo:", err instanceof Error ? err.message : err);
   }
 }

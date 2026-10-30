@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
 import { getPool } from "@/lib/db";
+import { getConsentMode } from "@/lib/env";
+import { LEGAL_VERSION } from "@/lib/legal/docs";
 import { buildClearCookie, buildSessionCookie, readSessionToken } from "./cookies";
 import type { Role } from "./permissions";
 import { hashToken, newSessionToken } from "./tokens";
@@ -16,7 +19,30 @@ export interface Session {
   mfaEnabled: boolean;
   /** Es súper admin pero aún no activó 2FA: no tiene poderes hasta hacerlo. */
   needsMfaSetup: boolean;
+  /**
+   * Hay documentos legales nuevos que esta persona aún no acepta. Mientras sea true, solo puede aceptar, salir o descargar sus datos
+   * (las rutas lo comprueban en los guards y las páginas en getSessionFromHeaders). Solo se aplica con LEGAL_CONSENT=required.
+   */
+  legalPending: boolean;
 }
+
+/** Quienes ya aceptaron la versión vigente se recuerdan 60 s para no consultar la base en cada petición. */
+const legalOk = new Map<string, number>();
+async function isLegalPending(userId: string): Promise<boolean> {
+  if (getConsentMode() !== "required") return false;
+  const key = `${userId}:${LEGAL_VERSION}`;
+  const until = legalOk.get(key);
+  if (until && until > Date.now()) return false;
+  const r = await getPool().query<{ version: string }>("SELECT version FROM legal_latest($1)", [userId]);
+  if (r.rows[0]?.version === LEGAL_VERSION) {
+    if (legalOk.size > 5_000) legalOk.clear();
+    legalOk.set(key, Date.now() + 60_000);
+    return false;
+  }
+  return true;
+}
+/** Lo que se puede hacer aun sin haber aceptado: aceptar, ver quién soy, salir y llevarse sus datos. */
+export const LEGAL_EXEMPT_PATHS = new Set(["/api/legal/accept", "/api/me", "/api/auth/logout", "/api/auth/logout-all", "/api/privacy/export"]);
 
 /** Negocio con el que se debe consultar la base y rol con el que se actúa. */
 export interface TenantContext {
@@ -42,6 +68,7 @@ export async function getSession(req: Request): Promise<Session | null> {
     actingTenantId: row.sess_acting_tenant,
     mfaEnabled: row.sess_mfa_enabled,
     needsMfaSetup: row.sess_needs_mfa_setup,
+    legalPending: await isLegalPending(row.sess_user_id),
   };
 }
 
@@ -73,12 +100,14 @@ export async function endAllSessions(req: Request): Promise<void> {
 /** Para páginas del servidor (Server Components): lee la sesión desde las cabeceras. */
 export async function getSessionFromHeaders(
   h: Headers,
+  opts: { allowLegalPending?: boolean } = {},
 ): Promise<{ session: Session; tokenHash: Buffer } | null> {
   const cookie = h.get("cookie");
   if (!cookie) return null;
   const req = new Request("http://interno.local/", { headers: { cookie } });
   const session = await getSession(req);
   const tokenHash = tokenHashOf(req);
+  if (session && session.legalPending && !opts.allowLegalPending) redirect("/terminos-nuevos");
   return session && tokenHash ? { session, tokenHash } : null;
 }
 

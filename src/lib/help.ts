@@ -167,8 +167,9 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: "seguridad", title: "Seguridad", summary: "Contraseña y verificación en dos pasos.",
     steps: [
-      "Cambia tu contraseña cuando quieras: pedimos la actual y cerramos tu sesión en los otros dispositivos.",
+      "Cambia tu contraseña cuando quieras: pedimos la actual (y el código de tu app si tienes la verificación en dos pasos) y cerramos tu sesión en los otros dispositivos.",
       "Activa la verificación en dos pasos con una app autenticadora y guarda tus códigos de recuperación en un lugar seguro.",
+      "Si alguien entra a tu cuenta desde un navegador o dispositivo que no habíamos visto, te llega un correo. Si no fuiste tú, cambia tu contraseña de inmediato.",
     ],
     links: [{ href: "/seguridad", label: "Abrir Seguridad" }],
   },

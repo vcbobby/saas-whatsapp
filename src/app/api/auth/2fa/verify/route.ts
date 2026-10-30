@@ -2,6 +2,7 @@ import { checkOrigin, errorResponse, jsonResponse, readJson, route } from "@/lib
 import { isRecoveryShape } from "@/lib/auth/mfa";
 import { completeWithRecovery, completeWithTotp, getPendingLogin } from "@/lib/auth/mfa-login";
 import { mfaVerifySchema } from "@/lib/auth/validation";
+import { notifyLoginDevice } from "@/lib/email/flows";
 
 export const POST = route(async (req) => {
   const blocked = checkOrigin(req);
@@ -29,6 +30,7 @@ export const POST = route(async (req) => {
     }
     return errorResponse(401, "codigo_invalido", "Código incorrecto.");
   }
+  await notifyLoginDevice(pending.userId, req);
   return jsonResponse({ ok: true, codesLeft: outcome.codesLeft }, 200, {
     "Set-Cookie": outcome.setCookie,
   });

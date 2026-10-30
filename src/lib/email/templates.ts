@@ -46,6 +46,13 @@ export const emailTemplates = {
   passwordChanged: () => make("clave_cambiada", `Tu contraseña de ${brand.name} fue cambiada`, {
     paragraphs: ["Te avisamos que la contraseña de tu cuenta acaba de cambiar y que cerramos tus sesiones abiertas.", "Si fuiste tú, no tienes que hacer nada. Si NO fuiste tú, recupera tu cuenta ahora con «¿Olvidaste tu contraseña?» y escríbenos de inmediato."],
   }),
+  newDevice: (o: { device: string; ip: string; when: unknown }) => make("nuevo_dispositivo", `Nuevo inicio de sesión en tu cuenta de ${brand.name}`, {
+    paragraphs: [
+      `Alguien acaba de entrar a tu cuenta desde un dispositivo que no habíamos visto: ${oneLine(o.device, 60)}${o.ip && o.ip !== "unknown" ? `, dirección ${oneLine(o.ip, 45)}` : ""}${fmtDate(o.when) ? `, el ${fmtDate(o.when)}` : ""}.`,
+      "Si fuiste tú, no tienes que hacer nada.",
+      "Si NO fuiste tú: entra a tu cuenta (si puedes) y cambia tu contraseña desde «Seguridad» (eso cierra las demás sesiones), o usa «¿Olvidaste tu contraseña?». Activa también la verificación en dos pasos.",
+    ],
+  }),
   invitation: (o: { url: string; business: string; role: string; inviter?: string }) => {
     const role = ({ owner: "dueño", admin: "administrador", agent: "agente" } as Record<string, string>)[o.role] ?? o.role;
     return make("invitacion", `${oneLine(o.inviter || "Te", 40) === "Te" ? "Te invitaron" : `${oneLine(o.inviter, 40)} te invitó`} a ${oneLine(o.business, 60)} en ${brand.name}`, {

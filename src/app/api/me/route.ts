@@ -13,6 +13,7 @@ export const GET = route(async (req) => {
       isSuperAdmin: s.isSuperAdmin,
       mfaEnabled: s.mfaEnabled,
       needsMfaSetup: s.needsMfaSetup,
+      legalPending: s.legalPending,
     },
     tenant: ctx
       ? {

@@ -2,15 +2,26 @@ import { errorResponse } from "./http";
 import { can, type Permission } from "./permissions";
 import { moduleForPermission, tenantHasModule } from "@/lib/plans/modules";
 import type { PlanModule } from "@/lib/plans/usage";
-import { effectiveTenant, getSession, tokenHashOf, type Session, type TenantContext } from "./session";
+import { LEGAL_EXEMPT_PATHS, effectiveTenant, getSession, tokenHashOf, type Session, type TenantContext } from "./session";
 
 type Guarded<T> = ({ ok: true } & T) | { ok: false; response: Response };
+
+/** Con documentos legales nuevos sin aceptar, la cuenta queda congelada salvo para aceptar, salir y descargar sus datos. */
+function legalBlock(req: Request, session: Session): Response | null {
+  if (!session.legalPending) return null;
+  let path = "";
+  try { path = new URL(req.url).pathname; } catch { /* sin ruta: se bloquea */ }
+  if (LEGAL_EXEMPT_PATHS.has(path)) return null;
+  return errorResponse(403, "terminos_pendientes", "Para seguir usando el servicio debes aceptar los términos actualizados. Recarga la página para verlos.");
+}
 
 export async function requireSession(req: Request): Promise<Guarded<{ session: Session }>> {
   const session = await getSession(req);
   if (!session) {
     return { ok: false, response: errorResponse(401, "no_autenticado", "Inicia sesión.") };
   }
+  const blocked = legalBlock(req, session);
+  if (blocked) return { ok: false, response: blocked };
   return { ok: true, session };
 }
 
@@ -23,6 +34,8 @@ export async function requireSuperAdmin(
   if (!session || !session.isSuperAdmin || !tokenHash) {
     return { ok: false, response: errorResponse(404, "no_encontrado", "No encontrado.") };
   }
+  const blocked = legalBlock(req, session);
+  if (blocked) return { ok: false, response: blocked };
   return { ok: true, session, tokenHash };
 }
 

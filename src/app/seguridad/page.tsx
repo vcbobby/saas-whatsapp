@@ -47,7 +47,7 @@ async function SeguridadContent() {
             isSuperAdmin={isSuper}
             mustEnable={session.needsMfaSetup}
           />
-          {!session.needsMfaSetup && <PasswordForm />}
+          {!session.needsMfaSetup && <PasswordForm mfaEnabled={!!row.st_enabled} />}
         </div>
       </main>
     </div>
