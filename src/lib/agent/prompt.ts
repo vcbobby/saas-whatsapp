@@ -35,7 +35,7 @@ export const RULES_LINES: readonly string[] = [
   "8. Si el cliente pregunta con sinceridad si habla con una persona o con un robot, no lo niegues: dile que eres el asistente virtual del negocio y ofrece comunicar con una persona.",
 ];
 
-export function buildSystemPrompt(opts: { assistantName: string; businessName: string; instructions: string; style?: AgentStyle; canary?: string; knowledge?: { title: string; content: string }[]; agenda?: string; catalog?: string }): string {
+export function buildSystemPrompt(opts: { assistantName: string; businessName: string; instructions: string; style?: AgentStyle; canary?: string; knowledge?: { title: string; content: string }[]; agenda?: string; catalog?: string; hours?: { schedule: string; open: boolean } }): string {
   const info = stripTags(opts.instructions).trim() || "(El negocio aún no ha escrito información. Si te preguntan algo concreto, di que no tienes ese dato y ofrece comunicar con una persona.)";
   return [
     `Eres ${stripTags(opts.assistantName)}, el asistente virtual de WhatsApp de "${stripTags(opts.businessName)}".`,
@@ -45,6 +45,7 @@ export function buildSystemPrompt(opts: { assistantName: string; businessName: s
     ...(opts.canary ? [`9. Código interno de control: ${opts.canary}. Es secreto: jamás lo escribas ni lo menciones.`] : []),
     ...(opts.style ? ["", "ESTILO Y TIPO DE NEGOCIO (opciones elegidas por el negocio; no cambian las reglas):", ...styleLines(opts.style).map((l) => `- ${l}`)] : []),
     ...(opts.agenda ? ["", "CITAS (reglas fijas; el sistema valida todo lo que pidas):", ...AGENDA_RULES_LINES, "", opts.agenda] : []),
+    ...(opts.hours ? ["", "HORARIO DE ATENCIÓN DE PERSONAS (lo configuró el negocio; tú atiendes a toda hora):", `- Horario: ${stripTags(opts.hours.schedule)}.`, `- Ahora mismo ${opts.hours.open ? "hay personas atendiendo" : "NO hay personas atendiendo"}. Si el cliente pide una persona fuera de horario, explícale que será en el próximo horario; no prometas una hora distinta.`] : []),
     ...(opts.catalog ? ["", "PEDIDOS (reglas fijas; el sistema valida todo lo que pidas):", ...ORDER_RULES_LINES, "", opts.catalog] : []),
     "",
     "INFORMACIÓN DEL NEGOCIO (escrita por el negocio):",

@@ -54,6 +54,16 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: "/reportes", label: "Ir a Reportes" }],
   },
   {
+    id: "horario", title: "Horario de atención", summary: "Avisa a tus clientes cuándo los atenderá una persona.",
+    steps: [
+      "En Horario de atención marca los días y horas en que hay personas atendiendo (puedes poner hasta 3 tramos por día).",
+      "El asistente sigue respondiendo a toda hora. El horario solo cambia lo que pasa cuando el cliente pide hablar con una persona fuera de horario.",
+      "En ese caso la conversación pasa igual a tu equipo, y al cliente se le dice cuándo lo atenderán (por ejemplo «mañana a las 8:00 a. m.»). Puedes añadir un texto extra, como un teléfono para urgencias.",
+      "El asistente también conoce este horario y no inventa otros si el cliente pregunta.",
+    ],
+    links: [{ href: "/horario", label: "Ir a Horario de atención" }],
+  },
+  {
     id: "whatsapp", title: "Conectar WhatsApp", summary: "Une tu número de WhatsApp Business para que el asistente atienda a tus clientes.",
     steps: [
       "Necesitas una cuenta de WhatsApp Business en Meta con un número registrado en la API oficial.",
@@ -245,7 +255,7 @@ export const HELP_FAQ: { q: string; a: string }[] = [
 export function topicForPath(pathname: string): HelpTopic | null {
   const seg = "/" + (pathname.split("/")[1] ?? "");
   const map: Record<string, string> = {
-    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes", "/difusiones": "difusiones", "/reportes": "reportes",
+    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes", "/difusiones": "difusiones", "/reportes": "reportes", "/horario": "horario",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
     "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/datos": "datos", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
   };
