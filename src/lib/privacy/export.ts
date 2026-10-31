@@ -31,6 +31,7 @@ export const EXPORTED_TABLES: ExportedTable[] = [
   { table: "appointments", order: "created_at, id" },
   { table: "catalog_products", order: "created_at, id" },
   { table: "catalog_settings", order: "1" },
+  { table: "public_catalog", order: "1" },
   { table: "stock_movements", order: "created_at, id" },
   { table: "orders", order: "created_at, id" },
   { table: "order_items", order: "id" },
