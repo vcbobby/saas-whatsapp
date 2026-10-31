@@ -64,6 +64,16 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: "/horario", label: "Ir a Horario de atención" }],
   },
   {
+    id: "tienda", title: "Catálogo público", summary: "Comparte tus productos por enlace o código QR y recibe pedidos por WhatsApp.",
+    steps: [
+      "En Catálogo público escribe el WhatsApp al que quieres que te escriban (con código de país y sin el 0 inicial) y marca «Mostrar mi catálogo».",
+      "Se publica una página con tus productos activos y sus precios. No se muestra tu inventario: solo «Agotado» cuando no queda.",
+      "Tus clientes eligen cantidades y, con un clic, se abre WhatsApp con el pedido escrito. El pedido llega como un mensaje normal a tu bandeja.",
+      "Copia el enlace o descarga el código QR para imprimirlo. Si dejas de querer mostrarlo, desmarca la casilla y la página deja de existir al instante.",
+    ],
+    links: [{ href: "/tienda", label: "Ir a Catálogo público" }, { href: "/catalogo", label: "Mi catálogo" }],
+  },
+  {
     id: "whatsapp", title: "Conectar WhatsApp", summary: "Une tu número de WhatsApp Business para que el asistente atienda a tus clientes.",
     steps: [
       "Necesitas una cuenta de WhatsApp Business en Meta con un número registrado en la API oficial.",
@@ -257,7 +267,7 @@ export const HELP_FAQ: { q: string; a: string }[] = [
 export function topicForPath(pathname: string): HelpTopic | null {
   const seg = "/" + (pathname.split("/")[1] ?? "");
   const map: Record<string, string> = {
-    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes", "/difusiones": "difusiones", "/reportes": "reportes", "/horario": "horario",
+    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes", "/difusiones": "difusiones", "/reportes": "reportes", "/horario": "horario", "/tienda": "tienda",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
     "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/datos": "datos", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
   };

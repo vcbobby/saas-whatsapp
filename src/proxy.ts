@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { LEGAL_SLUGS } from "@/lib/legal/docs";
+import { loadStore } from "@/lib/storefront/load";
 import { securityHeaders } from "@/lib/security/headers";
 
 const isAdminPath = (p: string) => p === "/admin" || p.startsWith("/admin/");
@@ -16,6 +17,17 @@ const isUnknownLegalDoc = (p: string) => {
     return true; // mal codificada: tampoco es un documento
   }
 };
+
+/** /c/<slug> sin catálogo publicado: 404 de verdad (si la base falla, se deja pasar y la página decide). */
+async function isUnknownStore(p: string): Promise<boolean> {
+  const m = /^\/c\/([^/]+)\/?$/.exec(p);
+  if (!m) return false;
+  try {
+    return (await loadStore(decodeURIComponent(m[1]!))) === null;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Páginas de administración: para quien no sea súper admin deben responder 404 REAL (estado HTTP incluido),
@@ -36,7 +48,7 @@ async function mayEnterAdmin(request: NextRequest): Promise<boolean> {
 // Se lee en cada petición (no al compilar), así APP_ENV de tu servidor decide si hay HSTS, etc.
 export async function proxy(request: NextRequest) {
   const response =
-    (isAdminPath(request.nextUrl.pathname) && !(await mayEnterAdmin(request))) || isUnknownLegalDoc(request.nextUrl.pathname)
+    (isAdminPath(request.nextUrl.pathname) && !(await mayEnterAdmin(request))) || isUnknownLegalDoc(request.nextUrl.pathname) || (await isUnknownStore(request.nextUrl.pathname))
       ? NextResponse.rewrite(new URL("/no-existe", request.url)) // una dirección que no existe: Next responde su 404
       : NextResponse.next();
   const headers = securityHeaders({
