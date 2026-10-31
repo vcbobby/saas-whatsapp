@@ -193,6 +193,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Al subirla ves una vista previa con lo que se creará, lo que se actualizará y las filas con error; recién al confirmar se cambia algo.",
       "Un producto que ya existe se actualiza solo con las columnas que llenes: una celda vacía no borra nada, y la importación nunca borra productos.",
       "Para exportar: elige clientes, pedidos, citas o productos. Si en Excel todo queda en una sola columna, descarga el otro formato.",
+      "Abajo puedes cargar «datos de ejemplo» (clientes, conversaciones, productos, pedidos y citas marcados «(ejemplo)») para recorrer el panel con movimiento. No reciben avisos y los borras con un botón sin tocar tus datos reales.",
+      "¿Algo no funciona o tienes una idea? Usa «Enviar comentario» en el menú de la izquierda: lo leemos todo.",
     ],
     links: [{ href: "/datos", label: "Importar y exportar" }],
   },
