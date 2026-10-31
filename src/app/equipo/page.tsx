@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
+import { AssignmentSettings } from "@/components/AssignmentSettings";
 import { TeamPanel } from "@/components/TeamPanel";
 import { getPool } from "@/lib/db";
 import { can } from "@/lib/auth/permissions";
@@ -55,6 +56,9 @@ async function EquipoContent() {
               id: r.i_id, email: r.i_email, role: r.i_role, expiresAt: new Date(r.i_expires).toISOString(),
             }))}
           />
+        </div>
+        <div className="mt-10 max-w-[820px]">
+          <AssignmentSettings />
         </div>
       </main>
     </div>

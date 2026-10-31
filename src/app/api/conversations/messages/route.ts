@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireTenant } from "@/lib/auth/guard";
 import { errorResponse, jsonResponse, route } from "@/lib/auth/http";
 import { windowEnd } from "@/lib/conversations/reply";
-import { withTenant } from "@/lib/db";
+import { getPool, withTenant } from "@/lib/db";
 
 const MAX_MESSAGES = 100;
 
@@ -42,17 +42,26 @@ export const GET = route(async (req) => {
         ORDER BY priority, created_at`,
       [tenantId, id.data],
     );
-    return { c: c.rows[0], msgs: msgs.rows, work: work.rows, lastInbound: inbound.rows[0]?.at ?? null };
+    const notes = await db.query(
+      "SELECT id, author_label, body, created_at FROM (SELECT * FROM conversation_notes WHERE tenant_id = $1 AND conversation_id = $2 ORDER BY created_at DESC, id DESC LIMIT 50) t ORDER BY created_at, id",
+      [tenantId, id.data],
+    );
+    return { c: c.rows[0], msgs: msgs.rows, work: work.rows, notes: notes.rows, lastInbound: inbound.rows[0]?.at ?? null };
   });
   if (!data) return errorResponse(404, "no_encontrado", "No encontrado.");
 
   const { c } = data;
+  // Nombre de quien la atiende (lo que va antes de la @ de su correo), solo si sigue en el equipo.
+  const assignedName = c.assigned_to && c.status === "human"
+    ? (await getPool().query<{ n: string | null }>("SELECT member_label($1, $2) AS n", [tenantId, c.assigned_to])).rows[0]?.n ?? null
+    : null;
   return jsonResponse({
     conversation: {
       id: c.id,
       status: c.status,
       handoffReason: c.handoff_reason,
       assignedToMe: c.assigned_to === auth.session.userId,
+      assignedName,
       replyUntil: windowEnd(data.lastInbound)?.toISOString() ?? null,
       contact: { id: c.contact_id, name: c.contact_name, waId: c.wa_id, label: c.label },
     },
@@ -66,6 +75,7 @@ export const GET = route(async (req) => {
       deliveryStatus: m.delivery_status,
       at: m.received_at,
     })),
+    notes: data.notes.map((n) => ({ id: n.id, author: n.author_label, body: n.body, at: n.created_at })),
     work: data.work,
   });
 });

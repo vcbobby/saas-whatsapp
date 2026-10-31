@@ -17,6 +17,8 @@ export const EXPORTED_TABLES: ExportedTable[] = [
   { table: "contacts", order: "created_at, id" },
   { table: "conversations", order: "created_at, id" },
   { table: "messages", order: "created_at, id" },
+  { table: "conversation_notes", order: "created_at, id" },
+  { table: "team_settings", order: "1" },
   { table: "agenda_services", order: "created_at, id" },
   { table: "agenda_hours", order: "1" },
   { table: "agenda_settings", order: "1" },
@@ -55,6 +57,8 @@ export const EXCLUDED_TABLES: Record<string, string> = {
   notification_queue: "Cola técnica interna.",
   webhook_queue: "Cola técnica interna.",
   webhook_deliveries: "Registro técnico de envíos de webhooks.",
+  assignment_rotation: "Turno interno para repartir conversaciones.",
+  handoff_alerts: "Cola técnica interna de avisos al equipo.",
   order_counters: "Contador interno de numeración.",
   email_outbox: "Cola de correos que la plataforma envía (verificaciones, invitaciones, avisos). El texto se borra al enviarse.",
 };

@@ -53,6 +53,13 @@ export const emailTemplates = {
       "Si NO fuiste tú: entra a tu cuenta (si puedes) y cambia tu contraseña desde «Seguridad» (eso cierra las demás sesiones), o usa «¿Olvidaste tu contraseña?». Activa también la verificación en dos pasos.",
     ],
   }),
+  chatToAttend: (o: { business: string; customer: string; reason: string; mine: boolean; url: string }) => make("chat_por_atender", `${o.mine ? "Te asignaron un chat" : "Un chat espera a una persona"}: ${oneLine(o.customer, 40)}`, {
+    paragraphs: [
+      `${o.mine ? "Te asignamos" : "Hay"} una conversación de «${oneLine(o.business, 60)}» que ${o.mine ? "necesita" : "necesita"} a una persona: ${oneLine(o.customer, 60)}.`,
+      oneLine(o.reason, 200),
+      "El asistente ya no le responde a esta persona hasta que alguien la atienda o se la devuelva.",
+    ], button: { label: "Abrir la conversación", url: o.url },
+  }),
   invitation: (o: { url: string; business: string; role: string; inviter?: string }) => {
     const role = ({ owner: "dueño", admin: "administrador", agent: "agente" } as Record<string, string>)[o.role] ?? o.role;
     return make("invitacion", `${oneLine(o.inviter || "Te", 40) === "Te" ? "Te invitaron" : `${oneLine(o.inviter, 40)} te invitó`} a ${oneLine(o.business, 60)} en ${brand.name}`, {

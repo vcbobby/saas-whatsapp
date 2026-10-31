@@ -4,6 +4,7 @@ import { TemplateSender } from "./TemplateSender";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CONTACT_LABELS, CONTACT_LABEL_TEXT, CONVERSATION_STATUS_LABEL, MEDIA_LABEL, WORK_TYPE_LABEL, type ContactLabel, type WorkType } from "@/lib/work/labels";
+import { postJson } from "@/lib/client";
 import { messageTime, relativeTime } from "@/lib/work/time";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -30,8 +31,9 @@ interface Msg {
   at: string;
 }
 interface Detail {
-  conversation: { id: string; status: Status; handoffReason: string | null; assignedToMe: boolean; replyUntil: string | null; contact: { id: string; name: string; waId: string; label: ContactLabel } };
+  conversation: { id: string; status: Status; handoffReason: string | null; assignedToMe: boolean; assignedName: string | null; replyUntil: string | null; contact: { id: string; name: string; waId: string; label: ContactLabel } };
   messages: Msg[];
+  notes: { id: string; author: string; body: string; at: string }[];
   work: { id: string; type: WorkType; title: string }[];
 }
 
@@ -60,6 +62,22 @@ function newKey(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
+/** Un pitido corto (si el navegador no deja reproducir audio todavía, se omite en silencio). */
+function beep() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.value = 0.08;
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.18);
+    osc.onended = () => void ctx.close();
+  } catch { /* sin audio */ }
+}
+
 export function Inbox({ initialId }: { initialId: string | null }) {
   const uid = useId();
   const [filter, setFilter] = useState<FilterId>("activas");
@@ -80,6 +98,11 @@ export function Inbox({ initialId }: { initialId: string | null }) {
   const [now, setNow] = useState(() => Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastCount = useRef(0);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [sound, setSound] = useState(true);
+  const seenAttention = useRef<Set<string> | null>(null);
 
   const qs = useCallback((before?: string) => {
     const p = new URLSearchParams({ filter });
@@ -109,6 +132,39 @@ export function Inbox({ initialId }: { initialId: string | null }) {
       clearInterval(t);
     };
   }, [loadList]);
+
+  // Aviso de conversaciones nuevas que esperan a una persona: sonido (si está activo) y número en la pestaña.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try { if (window.localStorage.getItem("inbox-sound") === "off") setSound(false); } catch { /* sin almacenamiento */ }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    if (!first) return;
+    const cur = new Set(first.filter((r) => r.needsAttention).map((r) => r.id));
+    const prev = seenAttention.current;
+    seenAttention.current = cur;
+    if (prev && sound && [...cur].some((id) => !prev.has(id))) beep();
+    const base = "Conversaciones";
+    document.title = cur.size > 0 ? `(${cur.size}) ${base}` : base;
+  }, [first, sound]);
+  useEffect(() => () => { document.title = "Conversaciones"; }, []);
+  function toggleSound() {
+    const on = !sound;
+    setSound(on);
+    try { window.localStorage.setItem("inbox-sound", on ? "on" : "off"); } catch { /* sin almacenamiento */ }
+    if (on) beep();
+  }
+  async function addNote() {
+    if (noteBusy || !selected || !noteDraft.trim()) return;
+    setNoteBusy(true); setNoteError(null);
+    const r = await postJson("/api/conversations/note", { id: selected, body: noteDraft });
+    setNoteBusy(false);
+    if (!r.ok) return setNoteError(r.data.message ?? "No se pudo guardar la nota.");
+    setNoteDraft("");
+    await loadDetail(selected);
+  }
 
   async function loadMore() {
     if (!next) return;
@@ -233,6 +289,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
               {f.label}
             </button>
           ))}
+          <button type="button" className="btn btn-sm btn-ghost-dark" aria-pressed={sound} onClick={toggleSound}>{sound ? "🔔 Sonido activado" : "🔕 Sonido apagado"}</button>
         </div>
         <div className="field mt-4">
           <label htmlFor={`${uid}-lab`} className="muted-dark" style={{ color: "rgba(255,255,255,0.78)" }}>Tipo de contacto</label>
@@ -314,7 +371,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="text-[24px]">{c.contact.name}</h2>
-                <p className="muted mt-1 text-[14px]">+{c.contact.waId} · {CONVERSATION_STATUS_LABEL[c.status]}{c.status === "human" && c.assignedToMe ? " · la tienes tú" : ""} · <Link href={`/clientes/${c.contact.id}`} className="link">Ver ficha</Link></p>
+                <p className="muted mt-1 text-[14px]">+{c.contact.waId} · {CONVERSATION_STATUS_LABEL[c.status]}{c.status === "human" && c.assignedToMe ? " · la tienes tú" : c.status === "human" && c.assignedName ? ` · la atiende ${c.assignedName}` : ""} · <Link href={`/clientes/${c.contact.id}`} className="link">Ver ficha</Link></p>
               </div>
               <div className="field" style={{ minWidth: 220 }}>
                 <label htmlFor={`${uid}-tipo`}>Tipo de contacto</label>
@@ -362,7 +419,21 @@ export function Inbox({ initialId }: { initialId: string | null }) {
 
             <div className="mt-6 flex max-h-[60vh] flex-col gap-3 overflow-y-auto rounded-[20px] p-4" style={{ background: "var(--color-pure-white)", border: "1px solid var(--color-fog-border)" }} role="log" aria-label="Mensajes" tabIndex={0}>
               {detail!.messages.length === 0 && <p className="muted text-[14px]">Todavía no hay mensajes.</p>}
-              {detail!.messages.map((m) => {
+              {[...detail!.messages.map((m) => ({ kind: "msg" as const, at: m.at, m })), ...detail!.notes.map((n) => ({ kind: "note" as const, at: n.at, n }))]
+                .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+                .map((it) => {
+                if (it.kind === "note") {
+                  return (
+                    <div key={`n-${it.n.id}`} className="flex justify-center">
+                      <div className="max-w-[90%] rounded-[14px] px-4 py-3" style={{ background: "var(--color-warn-bg, #fff8e1)", color: "var(--color-ink)", border: "1px dashed var(--color-ink-muted)" }}>
+                        <p className="text-[12px] font-medium" style={{ color: "var(--color-ink-muted)" }}>Nota privada de {it.n.author} · solo tu equipo la ve</p>
+                        <p className="text-[15px]" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{it.n.body}</p>
+                        <p className="mt-1 text-[12px]" style={{ color: "var(--color-ink-muted)" }}>{messageTime(it.n.at, now)}</p>
+                      </div>
+                    </div>
+                  );
+                }
+                const m = it.m;
                 const out = m.direction === "out";
                 const media = m.type !== "text" ? `[${MEDIA_LABEL[m.type] ?? m.type}]` : "";
                 const status = out ? (m.sendState === "failed" ? "No se pudo enviar" : m.sendState === "unknown" ? "Envío incierto" : m.deliveryStatus ? DELIVERY[m.deliveryStatus] : "") : "";
@@ -419,6 +490,16 @@ export function Inbox({ initialId }: { initialId: string | null }) {
                 <p className="muted mt-4 text-[14px]">Para responder desde aquí, toma la conversación: el asistente dejará de contestar mientras la tengas.</p>
               ))}
             <div role="alert" aria-live="assertive">{replyError && <p className="alert-error mt-3">{replyError}</p>}</div>
+            <form className="mt-6" onSubmit={(e) => { e.preventDefault(); void addNote(); }}>
+              <div className="field">
+                <label htmlFor={`${uid}-nota`}>Nota privada <span className="muted">(solo tu equipo la ve; no se envía al cliente)</span></label>
+                <textarea id={`${uid}-nota`} className="input" rows={2} maxLength={2000} value={noteDraft} disabled={noteBusy} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Ej. Pidió descuento por volumen; consultar con el dueño." />
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button type="submit" className="btn btn-sm btn-ghost-light" disabled={noteBusy || noteDraft.trim().length === 0}>{noteBusy ? "Guardando…" : "Guardar nota"}</button>
+              </div>
+              <div role="alert" aria-live="assertive">{noteError && <p className="alert-error mt-3">{noteError}</p>}</div>
+            </form>
           </div>
         )}
       </section>
