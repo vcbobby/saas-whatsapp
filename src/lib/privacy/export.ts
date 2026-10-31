@@ -60,6 +60,7 @@ export const EXCLUDED_TABLES: Record<string, string> = {
   webhook_queue: "Cola técnica interna.",
   webhook_deliveries: "Registro técnico de envíos de webhooks.",
   assignment_rotation: "Turno interno para repartir conversaciones.",
+  report_state: "Control interno de qué reportes semanales ya se enviaron.",
   broadcast_index: "Índice técnico interno de difusiones en curso.",
   handoff_alerts: "Cola técnica interna de avisos al equipo.",
   order_counters: "Contador interno de numeración.",

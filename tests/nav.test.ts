@@ -9,11 +9,11 @@ const titles = (i: Partial<NavInput>) => buildNav({ ...base, ...i }).map((g) => 
 describe("menú lateral", () => {
   it("el dueño ve todo, en grupos con nombre", () => {
     expect(titles({})).toEqual([null, "Mi negocio", "Asistente", "Automatizar", "Cuenta"]);
-    expect(hrefs({})).toEqual(["/panel", "/hoy", "/conversaciones", "/clientes", "/difusiones", "/agenda", "/catalogo", "/pedidos", "/agente", "/conocimiento", "/simulador", "/copiloto", "/whatsapp", "/automatizaciones", "/conexiones", "/cuenta", "/soporte", "/equipo", "/datos", "/plan", "/seguridad", "/ayuda"]);
+    expect(hrefs({})).toEqual(["/panel", "/hoy", "/conversaciones", "/clientes", "/reportes", "/difusiones", "/agenda", "/catalogo", "/pedidos", "/agente", "/conocimiento", "/simulador", "/copiloto", "/whatsapp", "/automatizaciones", "/conexiones", "/cuenta", "/soporte", "/equipo", "/datos", "/plan", "/seguridad", "/ayuda"]);
   });
   it("los módulos que el negocio usa van primero; los demás siguen a un clic", () => {
     const h = hrefs({ layout: layoutFor({ type: "catalogo", hasServices: false, hasProducts: true }) });
-    expect(h.slice(5, 8)).toEqual(["/catalogo", "/pedidos", "/agenda"]);
+    expect(h.slice(6, 9)).toEqual(["/catalogo", "/pedidos", "/agenda"]);
   });
   it("lo que el plan no incluye no aparece", () => {
     const l = layoutFor({ type: "citas", hasServices: true, hasProducts: true, allowed: ["agenda"] });
