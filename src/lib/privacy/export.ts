@@ -23,6 +23,8 @@ export const EXPORTED_TABLES: ExportedTable[] = [
   { table: "team_settings", order: "1" },
   { table: "agenda_services", order: "created_at, id" },
   { table: "agenda_hours", order: "1" },
+  { table: "business_hours", order: "weekday, start_min" },
+  { table: "business_hours_settings", order: "1" },
   { table: "agenda_settings", order: "1" },
   { table: "agenda_time_off", order: "1" },
   { table: "appointments", order: "created_at, id" },

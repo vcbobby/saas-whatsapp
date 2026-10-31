@@ -70,6 +70,7 @@ export function buildNav(i: NavInput): NavGroup[] {
     if (i.canManage) {
       const assistant: NavItem[] = [
         { href: "/agente", label: "Mi asistente", hint: "Cómo atiende y habla", icon: "bot" },
+        ...(i.canManage ? [{ href: "/horario", label: "Horario de atención", hint: "Cuándo hay personas", icon: "today" as const }] : []),
         { href: "/conocimiento", label: "Conocimiento", hint: "Documentos que consulta", icon: "book" },
         { href: "/simulador", label: "Probar", hint: "Chatea con él antes de publicar", icon: "flask" },
       ];

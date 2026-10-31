@@ -17,6 +17,7 @@ import { getEmbedder, type Embedder } from "@/lib/kb/embeddings";
 import { searchKnowledge, type Snippet } from "@/lib/kb/search";
 import { AGENDA_RULES_LINES, bookingTexts, buildMenu, createAgentAppointment, parseBookingRequest, stripBookingMarkers, whenLabel, type AgendaMenu } from "./booking";
 import { ORDER_RULES_LINES, buildCatalogMenu, createAgentOrder, orderTexts, parseOrderRequest, stripOrderMarkers, type CatalogMenu } from "./ordering";
+import { hoursContext, type HoursContext } from "@/lib/hours/agent";
 import { allowedContacts, checkOutput, looksLikeInjection, newCanary } from "./safety";
 
 export type AgentOutcome =
@@ -271,6 +272,7 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
   const fixed = fixedTexts(ctx.style);
   let text: string;
   let wantsHandoff = false;
+  const hours: HoursContext | null = await hoursContext(tenantId);
   let handoffReason = "pedido_de_persona";
   if (!(TEXT_TYPES.has(ctx.msgType) && ctx.body)) {
     text = fixed.nonText;
@@ -339,7 +341,7 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
     }
     const out = await llm
       .generate({
-        system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text, catalog: catalog?.text }),
+        system: buildSystemPrompt({ assistantName: ctx.assistantName, businessName: ctx.tenantName, instructions: ctx.instructions, style: ctx.style, canary, knowledge, agenda: menu?.text, catalog: catalog?.text, hours: hours ? { schedule: hours.schedule, open: hours.open } : undefined }),
         messages: buildTurns(history),
         maxTokens: LLM_MAX_TOKENS,
       })
@@ -409,6 +411,9 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
       wantsHandoff = parsed.handoff;
     }
   }
+
+  // Si pasa a una persona y ahora no hay nadie, se le dice al cliente cuándo lo atenderán.
+  if (wantsHandoff && hours?.notice) text = `${text}\n\n${hours.notice}`;
 
   // Descifrar el token ANTES de crear la fila "sending": si falla aquí, no hay nada a medias.
   const token = decryptSecret(ctx.secretEnc, `wa:${tenantId}:${ctx.phoneId}`, ctx.keyVersion);
