@@ -33,6 +33,18 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: "/clientes", label: "Ir a Clientes" }],
   },
   {
+    id: "difusiones", title: "Difusiones", summary: "Envía una promoción por WhatsApp a tus clientes que aceptaron recibirla.",
+    steps: [
+      "Necesitas una plantilla de WhatsApp aprobada que diga cómo darse de baja (por ejemplo «Responde BAJA para no recibir más promociones»). Se crea en WhatsApp > Plantillas.",
+      "Crea la difusión: elige la plantilla, qué poner en cada variable (el nombre del cliente o un texto fijo) y a quién (todos, una etiqueta o un tipo de contacto).",
+      "Solo reciben el mensaje las personas con «permiso para promociones» registrado en su ficha. Se dejan fuera quienes pidieron la baja, los marcados como personales, los que está atendiendo una persona y quienes recibieron otra difusión en los últimos 3 días.",
+      "La vista previa te dice a cuántas personas llegaría y por qué se excluye a las demás. Nada se envía hasta que confirmes.",
+      "El envío es gradual (unos 250 por día como máximo, el límite de un número nuevo en WhatsApp). Si fallan muchos mensajes, la difusión se pausa sola para proteger tu número.",
+      "En los resultados ves cuántos se enviaron, entregaron, leyeron y respondieron. Después puedes reenviar a quienes no la leyeron.",
+    ],
+    links: [{ href: "/difusiones", label: "Ir a Difusiones" }, { href: "/whatsapp", label: "Plantillas de WhatsApp" }],
+  },
+  {
     id: "whatsapp", title: "Conectar WhatsApp", summary: "Une tu número de WhatsApp Business para que el asistente atienda a tus clientes.",
     steps: [
       "Necesitas una cuenta de WhatsApp Business en Meta con un número registrado en la API oficial.",
@@ -224,7 +236,7 @@ export const HELP_FAQ: { q: string; a: string }[] = [
 export function topicForPath(pathname: string): HelpTopic | null {
   const seg = "/" + (pathname.split("/")[1] ?? "");
   const map: Record<string, string> = {
-    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes",
+    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes", "/difusiones": "difusiones",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
     "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/datos": "datos", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
   };
