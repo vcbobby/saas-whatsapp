@@ -11,6 +11,7 @@ import { indexPending } from "./kb";
 import { deliverDue } from "@/lib/webhooks/deliver";
 import { sendDue } from "@/lib/notifications/send";
 import { tickAutomations } from "@/lib/automations/tick";
+import { notifyHandoffs } from "@/lib/notifications/handoff";
 import { purgeDueTenants } from "@/lib/privacy/deletion";
 import { refreshRate } from "@/lib/billing/rate-refresh";
 import { queuePlanNotices, sendDueEmails } from "@/lib/email/outbox";
@@ -112,6 +113,7 @@ async function tickTime() {
   ticking = true;
   try {
     await tickAutomations();
+    await notifyHandoffs();
   } catch (err) {
     console.error("[worker] reglas por tiempo falló:", err instanceof Error ? err.message : err);
   } finally {
