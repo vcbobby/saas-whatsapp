@@ -314,7 +314,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="text-[24px]">{c.contact.name}</h2>
-                <p className="muted mt-1 text-[14px]">+{c.contact.waId} · {CONVERSATION_STATUS_LABEL[c.status]}{c.status === "human" && c.assignedToMe ? " · la tienes tú" : ""}</p>
+                <p className="muted mt-1 text-[14px]">+{c.contact.waId} · {CONVERSATION_STATUS_LABEL[c.status]}{c.status === "human" && c.assignedToMe ? " · la tienes tú" : ""} · <Link href={`/clientes/${c.contact.id}`} className="link">Ver ficha</Link></p>
               </div>
               <div className="field" style={{ minWidth: 220 }}>
                 <label htmlFor={`${uid}-tipo`}>Tipo de contacto</label>

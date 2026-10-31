@@ -4,6 +4,8 @@ export type Role = (typeof ROLES)[number];
 const MATRIX = {
   "conversations:read": ["owner", "admin", "agent"],
   "conversations:reply": ["owner", "admin", "agent"],
+  "contacts:read": ["owner", "admin", "agent"],
+  "contacts:edit": ["owner", "admin", "agent"],
   "contacts:manage": ["owner", "admin"],
   "team:manage": ["owner", "admin"],
   "team:roles": ["owner"],

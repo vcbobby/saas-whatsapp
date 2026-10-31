@@ -270,8 +270,8 @@ describe("exportar", () => {
     expect(ids).toBeTruthy();
 
     const clientes = await (await exp(t, "que=clientes&formato=csv")).text();
-    expect(clientes).toMatch(/^Nombre,Teléfono \(WhatsApp\),Primer contacto \(America\/Caracas\),Pedidos,Citas\r\n/);
-    expect(clientes).toMatch(/Ana Pérez,584121234567,\d{4}-\d{2}-\d{2} \d{2}:\d{2},1,1\r\n/);
+    expect(clientes).toMatch(/^Nombre,Teléfono \(WhatsApp\),Primer contacto \(America\/Caracas\),Tipo,Etiquetas,Nota,No recibir avisos,Permiso para promociones,Pedidos,Citas\r\n/);
+    expect(clientes).toMatch(/Ana Pérez,584121234567,\d{4}-\d{2}-\d{2} \d{2}:\d{2},Sin clasificar,,,No,No,1,1\r\n/);
 
     const pedidos = await (await exp(t, "que=pedidos&formato=excel")).text();
     expect(pedidos).toContain("2;2026-03-10 11:00;Luis;;Pendiente;Manual;USD;1,00;1 x Gorra;;");
