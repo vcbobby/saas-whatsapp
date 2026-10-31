@@ -3,6 +3,8 @@ import { errorResponse, route } from "@/lib/auth/http";
 import { withTenant } from "@/lib/db";
 import { csvDownload, phoneCell, type CsvFormat } from "@/lib/csv/write";
 import type { Permission } from "@/lib/auth/permissions";
+import { CONSENT_SOURCE_TEXT, type ConsentSource } from "@/lib/customers/tags";
+import { CONTACT_LABEL_TEXT as LABEL, type ContactLabel } from "@/lib/work/labels";
 
 const MAX_ROWS = 50_000;
 const KINDS = { clientes: "contacts:manage", pedidos: "orders:read", citas: "agenda:read", productos: "catalog:manage" } as const satisfies Record<string, Permission>;
@@ -46,12 +48,12 @@ export const GET = route(async (req) => {
     let header: string[]; let rows: unknown[][];
     if (que === "clientes") {
       const r = await db.query(
-        `SELECT c.display_name, c.wa_id, c.created_at,
+        `SELECT c.display_name, c.wa_id, c.created_at, c.label, c.tags, c.notes, c.notifications_off, c.promo_consent_at, c.promo_consent_source,
                 (SELECT count(*)::int FROM orders o WHERE o.tenant_id = c.tenant_id AND o.contact_id = c.id) AS pedidos,
                 (SELECT count(*)::int FROM appointments a WHERE a.tenant_id = c.tenant_id AND a.contact_id = c.id) AS citas
            FROM contacts c WHERE c.tenant_id = $1 ORDER BY c.created_at DESC LIMIT ${MAX_ROWS}`, [tenantId]);
-      header = ["Nombre", "Teléfono (WhatsApp)", `Primer contacto (${tz})`, "Pedidos", "Citas"];
-      rows = r.rows.map((x) => [x.display_name, phoneCell(x.wa_id), new Date(x.created_at).toLocaleString("sv-SE", { timeZone: tz }).slice(0, 16), x.pedidos, x.citas]);
+      header = ["Nombre", "Teléfono (WhatsApp)", `Primer contacto (${tz})`, "Tipo", "Etiquetas", "Nota", "No recibir avisos", "Permiso para promociones", "Pedidos", "Citas"];
+      rows = r.rows.map((x) => [x.display_name, phoneCell(x.wa_id), new Date(x.created_at).toLocaleString("sv-SE", { timeZone: tz }).slice(0, 16), LABEL[x.label as ContactLabel] ?? x.label, (x.tags as string[]).join("; "), x.notes, x.notifications_off ? "Sí" : "No", x.promo_consent_at ? `Sí (${new Date(x.promo_consent_at).toLocaleDateString("sv-SE", { timeZone: tz })}, ${CONSENT_SOURCE_TEXT[x.promo_consent_source as ConsentSource] ?? x.promo_consent_source})` : "No", x.pedidos, x.citas]);
     } else if (que === "pedidos") {
       const rg = range("o.created_at");
       const r = await db.query(

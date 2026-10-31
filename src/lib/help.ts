@@ -21,6 +21,18 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: "/panel", label: "Ir a Inicio" }],
   },
   {
+    id: "clientes", title: "Clientes", summary: "La ficha de cada persona que te escribe: su historial, etiquetas y notas.",
+    steps: [
+      "Cada persona que te escribe por WhatsApp aparece sola en Clientes. Busca por nombre o teléfono, o filtra por etiqueta y tipo de contacto.",
+      "Abre una ficha para ver sus conversaciones, pedidos y citas, y cuánto ha comprado.",
+      "Las etiquetas (como «mayorista» o «VIP») sirven para agrupar clientes. Puedes poner hasta 10 por persona.",
+      "La nota interna es solo para tu equipo: el cliente nunca la ve.",
+      "«Permiso para promociones» registra cuándo y cómo aceptó recibirlas. Las difusiones (próximamente) solo irán a quienes lo tengan.",
+      "«No enviarle avisos» detiene los recordatorios y mensajes automáticos para esa persona. Si ella escribe «BAJA», se activa sola.",
+    ],
+    links: [{ href: "/clientes", label: "Ir a Clientes" }],
+  },
+  {
     id: "whatsapp", title: "Conectar WhatsApp", summary: "Une tu número de WhatsApp Business para que el asistente atienda a tus clientes.",
     steps: [
       "Necesitas una cuenta de WhatsApp Business en Meta con un número registrado en la API oficial.",
@@ -209,7 +221,7 @@ export const HELP_FAQ: { q: string; a: string }[] = [
 export function topicForPath(pathname: string): HelpTopic | null {
   const seg = "/" + (pathname.split("/")[1] ?? "");
   const map: Record<string, string> = {
-    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones",
+    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
     "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/datos": "datos", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
   };
