@@ -5,6 +5,7 @@ import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
 import { withTenant } from "@/lib/db";
 import { loadModuleLayout, type ModuleLayout } from "@/lib/modules";
 import { buildNav } from "@/lib/nav";
+import { FeedbackButton } from "./FeedbackButton";
 import { LogoutButton } from "./LogoutButton";
 import { Sidebar } from "./Sidebar";
 
@@ -58,6 +59,7 @@ export async function AppHeader({
       footer={
         <>
           <p className="app-user" title={email}>{email}</p>
+          {hasTenant && !adminMode && <FeedbackButton />}
           <div className="app-footer-row">
             {roleLabel && <span className="badge badge-neutral">{roleLabel}</span>}
             <LogoutButton />

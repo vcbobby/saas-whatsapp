@@ -61,9 +61,9 @@ describe("menú lateral", () => {
   it("dentro de /admin el súper admin ve su propio menú; los demás no", () => {
     const admin = (i: Partial<NavInput>) => buildNav({ ...base, isSuperAdmin: true, adminMode: true, ...i });
     expect(admin({}).map((g) => g.title)).toEqual(["Plataforma", "Cuenta"]);
-    expect(admin({}).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/soporte", "/admin/uso", "/admin/costos", "/admin/planes", "/admin/cobros", "/panel", "/seguridad", "/ayuda"]);
+    expect(admin({}).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/soporte", "/admin/comentarios", "/admin/uso", "/admin/costos", "/admin/planes", "/admin/cobros", "/panel", "/seguridad", "/ayuda"]);
     // Sin negocio no hay «Mi negocio».
-    expect(admin({ hasTenant: false }).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/soporte", "/admin/uso", "/admin/costos", "/admin/planes", "/admin/cobros", "/seguridad", "/ayuda"]);
+    expect(admin({ hasTenant: false }).flatMap((g) => g.items.map((x) => x.href))).toEqual(["/admin", "/admin/negocios", "/admin/soporte", "/admin/comentarios", "/admin/uso", "/admin/costos", "/admin/planes", "/admin/cobros", "/seguridad", "/ayuda"]);
     // Quien no es súper admin no obtiene el menú de administración aunque lo pida.
     const h = hrefs({ adminMode: true, isSuperAdmin: false });
     expect(h.some((x) => x.startsWith("/admin"))).toBe(false);
@@ -71,7 +71,7 @@ describe("menú lateral", () => {
   });
 
   it("«Resumen» solo está activo en /admin exacto", () => {
-    expect(ADMIN_NAV.map((x) => [x.href, x.exact === true])).toEqual([["/admin", true], ["/admin/negocios", false], ["/admin/soporte", false], ["/admin/uso", false], ["/admin/costos", false], ["/admin/planes", false], ["/admin/cobros", false]]);
+    expect(ADMIN_NAV.map((x) => [x.href, x.exact === true])).toEqual([["/admin", true], ["/admin/negocios", false], ["/admin/soporte", false], ["/admin/comentarios", false], ["/admin/uso", false], ["/admin/costos", false], ["/admin/planes", false], ["/admin/cobros", false]]);
     expect(isActive("/admin", "/admin/negocios", true)).toBe(false);
     expect(isActive("/admin", "/admin", true)).toBe(true);
     expect(isActive("/admin/negocios", "/admin/negocios")).toBe(true);

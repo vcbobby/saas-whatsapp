@@ -21,6 +21,7 @@ export const EXPORTED_TABLES: ExportedTable[] = [
   { table: "broadcast_recipients", order: "id" },
   { table: "conversation_notes", order: "created_at, id" },
   { table: "team_settings", order: "1" },
+  { table: "feedback", order: "created_at, id" },
   { table: "agenda_services", order: "created_at, id" },
   { table: "agenda_hours", order: "1" },
   { table: "business_hours", order: "weekday, start_min" },

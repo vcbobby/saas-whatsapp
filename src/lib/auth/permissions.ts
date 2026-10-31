@@ -7,6 +7,7 @@ const MATRIX = {
   "contacts:read": ["owner", "admin", "agent"],
   "contacts:edit": ["owner", "admin", "agent"],
   "contacts:manage": ["owner", "admin"],
+  "feedback:send": ["owner", "admin", "agent"],
   "reports:read": ["owner", "admin"],
   "broadcasts:manage": ["owner", "admin"],
   "team:manage": ["owner", "admin"],

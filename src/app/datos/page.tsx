@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppHeader, ROLE_LABEL } from "@/components/AppHeader";
 import { DataTransfer } from "@/components/DataTransfer";
+import { DemoData } from "@/components/DemoData";
 import { can } from "@/lib/auth/permissions";
 import { effectiveTenant, getSessionFromHeaders } from "@/lib/auth/session";
 import { tenantHasModule } from "@/lib/plans/modules";
@@ -41,6 +42,9 @@ async function DatosContent() {
         <p className="muted-dark mt-3 max-w-[640px]">Sube tus productos desde Excel y descarga tus datos para trabajarlos en una hoja de cálculo.</p>
         <div className="mt-10">
           <DataTransfer agenda={agenda} catalogo={catalogo} />
+        </div>
+        <div className="mt-10">
+          <DemoData />
         </div>
       </main>
     </div>
