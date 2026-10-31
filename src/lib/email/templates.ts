@@ -60,6 +60,10 @@ export const emailTemplates = {
       "El asistente ya no le responde a esta persona hasta que alguien la atienda o se la devuelva.",
     ], button: { label: "Abrir la conversación", url: o.url },
   }),
+  weeklyReport: (o: { business: string; period: string; lines: string[]; url: string }) => make("reporte_semanal", `Tu semana en ${oneLine(o.business, 50)}: ${oneLine(o.period, 30)}`, {
+    paragraphs: [`Así le fue a «${oneLine(o.business, 60)}» del ${oneLine(o.period, 30)}:`, ...o.lines.map((l) => `• ${oneLine(l, 400)}`)],
+    button: { label: "Ver el reporte completo", url: o.url }, footer: "Recibes este resumen cada lunes. Puedes apagarlo en Reportes.",
+  }),
   invitation: (o: { url: string; business: string; role: string; inviter?: string }) => {
     const role = ({ owner: "dueño", admin: "administrador", agent: "agente" } as Record<string, string>)[o.role] ?? o.role;
     return make("invitacion", `${oneLine(o.inviter || "Te", 40) === "Te" ? "Te invitaron" : `${oneLine(o.inviter, 40)} te invitó`} a ${oneLine(o.business, 60)} en ${brand.name}`, {

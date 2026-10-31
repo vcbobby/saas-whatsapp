@@ -45,6 +45,15 @@ export const HELP_TOPICS: HelpTopic[] = [
     links: [{ href: "/difusiones", label: "Ir a Difusiones" }, { href: "/whatsapp", label: "Plantillas de WhatsApp" }],
   },
   {
+    id: "reportes", title: "Reportes", summary: "Mira cómo va tu negocio y recibe un resumen cada lunes.",
+    steps: [
+      "En Reportes ves los últimos 7 o 30 días completos (hasta ayer) comparados con el período anterior.",
+      "Incluye conversaciones, clientes nuevos, cuántas resolvió el asistente solo y cuántas pasaron a una persona, tiempos de primera respuesta, horas de más movimiento, pedidos, ventas y citas.",
+      "Cada lunes el dueño y los administradores reciben un resumen por correo (si hubo actividad). Puedes apagarlo o pedirlo en cualquier momento desde la misma página.",
+    ],
+    links: [{ href: "/reportes", label: "Ir a Reportes" }],
+  },
+  {
     id: "whatsapp", title: "Conectar WhatsApp", summary: "Une tu número de WhatsApp Business para que el asistente atienda a tus clientes.",
     steps: [
       "Necesitas una cuenta de WhatsApp Business en Meta con un número registrado en la API oficial.",
@@ -236,7 +245,7 @@ export const HELP_FAQ: { q: string; a: string }[] = [
 export function topicForPath(pathname: string): HelpTopic | null {
   const seg = "/" + (pathname.split("/")[1] ?? "");
   const map: Record<string, string> = {
-    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes", "/difusiones": "difusiones",
+    "/panel": "inicio", "/whatsapp": "whatsapp", "/agente": "asistente", "/conocimiento": "conocimiento", "/conversaciones": "conversaciones", "/clientes": "clientes", "/difusiones": "difusiones", "/reportes": "reportes",
     "/hoy": "hoy", "/agenda": "agenda", "/catalogo": "catalogo", "/pedidos": "pedidos", "/simulador": "probar", "/copiloto": "copiloto",
     "/automatizaciones": "automatizaciones", "/conexiones": "conexiones", "/equipo": "equipo", "/datos": "datos", "/plan": "plan", "/cuenta": "cuenta", "/seguridad": "seguridad", "/admin": "administracion", "/soporte": "soporte",
   };

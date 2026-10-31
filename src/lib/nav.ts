@@ -60,6 +60,7 @@ export function buildNav(i: NavInput): NavGroup[] {
         { href: "/hoy", label: "Hoy", hint: "Tareas y avisos por atender", icon: "today" },
         { href: "/conversaciones", label: "Conversaciones", hint: "Chats con tus clientes", icon: "chat" },
         { href: "/clientes", label: "Clientes", hint: "Historial, etiquetas y notas", icon: "users" },
+        ...(i.canManage ? [{ href: "/reportes", label: "Reportes", hint: "Cómo va tu negocio", icon: "chart" as const }] : []),
         ...(i.canManage ? [{ href: "/difusiones", label: "Difusiones", hint: "Promociones por WhatsApp", icon: "mail" as const }] : []),
       ],
     });
