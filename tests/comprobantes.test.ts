@@ -259,7 +259,7 @@ describe("comprobante: el asistente", () => {
     void c2;
     const m2 = await imageIn(t2, c2.wa);
     const d2 = deps();
-    await runAgent(job(t2, m2), d2.raw);
+    expect(await runAgent(job(t2, m2), d2.raw)).toBe("replied"); // si falla, el valor recibido dice por qué no respondió
     expect(d2.send.mock.calls[0]![3]).toContain("solo puedo leer mensajes de texto");
   });
 });

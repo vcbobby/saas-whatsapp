@@ -57,6 +57,9 @@ export async function registrarse(page, negocio = "Negocio de Prueba") {
 }
 
 export async function captura(page, nombre) {
+  // Esperar a que la página termine de cargar y a que React se «hidrate»: tomar la foto antes puede alterar el HTML y producir un aviso falso de hidratación.
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" }); // la insignia de desarrollo de Next
-  await page.screenshot({ path: `${CAPTURAS}${nombre}.png`, fullPage: true });
+  // caret: "initial" → Playwright no escribe «caret-color: transparent» en los campos (eso es lo que disparaba el aviso de hidratación).
+  await page.screenshot({ path: `${CAPTURAS}${nombre}.png`, fullPage: true, caret: "initial" });
 }
