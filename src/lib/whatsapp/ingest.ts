@@ -1,5 +1,6 @@
 import { getPool, withTenant } from "@/lib/db";
 import { optOutIntent } from "@/lib/notifications/send";
+import { registerProof } from "@/lib/payments/proof";
 import type { TenantBatch } from "./payload";
 
 export interface IngestResult {
@@ -50,11 +51,11 @@ export async function ingestBatch(batch: TenantBatch): Promise<IngestResult> {
       const conversationId = conv.rows[0]!.id;
 
       const ins = await db.query(
-        `INSERT INTO messages (tenant_id, conversation_id, direction, wa_message_id, msg_type, body, created_at, process_state)
-         VALUES ($1, $2, 'in', $3, $4, $5, $6, 'pending')
+        `INSERT INTO messages (tenant_id, conversation_id, direction, wa_message_id, msg_type, body, created_at, process_state, media_id, media_mime)
+         VALUES ($1, $2, 'in', $3, $4, $5, $6, 'pending', $7, $8)
          ON CONFLICT (tenant_id, wa_message_id) DO NOTHING
          RETURNING id`,
-        [tenantId, conversationId, m.waMessageId, m.type, m.body, m.at],
+        [tenantId, conversationId, m.waMessageId, m.type, m.body, m.at, m.mediaId ?? null, m.mediaMime ?? null],
       );
       if (ins.rowCount) {
         newMessages++;
@@ -62,6 +63,8 @@ export async function ingestBatch(batch: TenantBatch): Promise<IngestResult> {
         const intent = m.type === "text" ? optOutIntent(m.body) : null;
         if (intent) await db.query("UPDATE contacts SET notifications_off = $3 WHERE tenant_id = $1 AND id = $2", [tenantId, contactId, intent === "off"]);
         inbound.push({ tenantId, messageId: ins.rows[0].id });
+        // Una imagen de quien tiene un pedido por pagar puede ser su comprobante: se deja para verificar.
+        if (m.mediaId) await registerProof(db, tenantId, { contactId, conversationId, messageId: ins.rows[0].id, customerName: m.name });
         await db.query(
           `UPDATE conversations SET last_message_at = GREATEST(COALESCE(last_message_at, $3), $3)
            WHERE tenant_id = $1 AND id = $2`,

@@ -149,6 +149,8 @@ export const HELP_TOPICS: HelpTopic[] = [
       "Los pedidos llegan por el asistente o los creas tú a mano, con productos de tu catálogo.",
       "Cada pedido pasa por pendiente, confirmado y entregado (o cancelado). Confirmarlo descuenta el stock.",
       "Los pedidos pendientes de más de un día se destacan en tu resumen.",
+      "Cobro: cada pedido muestra «Sin pagar», «Pago por verificar» o «Pagado». Si el cliente manda una foto de su pago y tiene un solo pedido por pagar, queda como su comprobante y aparece una tarea «Pago por verificar»: pulsa «Ver comprobante», revisa el monto y marca «Pagado» (con la forma de pago) o «No es un pago válido».",
+      "Nada se marca pagado solo: siempre lo confirma una persona. Las fotos se descargan de WhatsApp al verlas (se guardan allí unos 30 días); si ya no están, pídele al cliente que la reenvíe.",
     ],
     links: [{ href: "/pedidos", label: "Ver pedidos" }, { href: "/catalogo", label: "Revisar el catálogo" }],
   },

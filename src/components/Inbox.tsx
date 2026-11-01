@@ -25,6 +25,7 @@ interface Msg {
   direction: "in" | "out";
   sender: "customer" | "assistant" | "me" | "team";
   type: string;
+  hasMedia?: boolean;
   body: string | null;
   sendState: string | null;
   deliveryStatus: string | null;
@@ -445,6 +446,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
                     >
                       {out && <p className="text-[12px] font-medium" style={{ color: "var(--color-ink-muted)" }}>{SENDER_LABEL[m.sender === "customer" ? "assistant" : m.sender]}</p>}
                       {media && <p className="text-[14px] font-medium">{media}</p>}
+                      {m.hasMedia && m.type === "image" && <ChatImage id={m.id} />}
                       {m.body && <p className="text-[15px]" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.body}</p>}
                       <p className="mt-1 text-[12px]" style={{ color: "var(--color-ink-muted)" }}>
                         {messageTime(m.at, now)}
@@ -503,6 +505,34 @@ export function Inbox({ initialId }: { initialId: string | null }) {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+
+/** Foto que mandó el cliente: se baja de WhatsApp solo cuando la persona pulsa «Ver imagen» (una sola descarga). */
+function ChatImage({ id }: { id: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => () => { if (src) URL.revokeObjectURL(src); }, [src]);
+  async function open() {
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch(`/api/conversations/media?id=${id}`, { cache: "no-store" });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string };
+        setError(j.message ?? "No se pudo cargar la imagen.");
+      } else setSrc(URL.createObjectURL(await res.blob()));
+    } catch { setError("No hay conexión con el servidor."); }
+    setBusy(false);
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  if (src) return <img src={src} alt="Imagen enviada por el cliente" style={{ maxWidth: "100%", maxHeight: 360, borderRadius: 8, marginTop: 4 }} />;
+  return (
+    <div className="mt-1">
+      <button type="button" className="btn btn-sm btn-ghost-light" disabled={busy} onClick={() => void open()}>{busy ? "Cargando…" : "Ver imagen"}</button>
+      {error && <p role="alert" className="mt-1 text-[13px]">{error}</p>}
     </div>
   );
 }

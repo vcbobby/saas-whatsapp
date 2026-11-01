@@ -37,6 +37,9 @@ export interface InboundMessage {
   at: Date;
   type: string;
   body: string | null;
+  /** Imagen recibida: id de Meta para descargarla después y su tipo (solo JPG, PNG o WebP). */
+  mediaId?: string | null;
+  mediaMime?: string | null;
 }
 export interface StatusUpdate {
   waMessageId: string;
@@ -60,6 +63,18 @@ export function metaDate(ts: string | undefined, now = Date.now()): Date {
   const ms = n * 1000;
   if (ms > now + 5 * 60_000 || ms < now - 30 * 86_400_000) return new Date(now);
   return new Date(ms);
+}
+
+const IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** Id y tipo de una imagen del mensaje; null si no es una imagen utilizable. */
+function imageOf(m: Record<string, unknown>): { mediaId: string; mediaMime: string } | null {
+  if (m.type !== "image") return null;
+  const part = m.image as Record<string, unknown> | undefined;
+  if (!part || typeof part !== "object") return null;
+  const id = part.id, mime = typeof part.mime_type === "string" ? part.mime_type.toLowerCase().split(";")[0]!.trim() : "";
+  if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(id) || !IMAGE_MIMES.has(mime)) return null;
+  return { mediaId: id, mediaMime: mime };
 }
 
 function bodyOf(m: Record<string, unknown>): string | null {
@@ -102,6 +117,7 @@ export function parseWebhook(json: unknown, now = Date.now()): TenantBatch[] | n
         if (++items > MAX_ITEMS) break;
         if (!/^\d{5,32}$/.test(m.from) || m.id.length > 200) continue;
         const raw = bodyOf(m);
+        const img = imageOf(m);
         batch.messages.push({
           waId: m.from,
           name: names.get(m.from) ?? null,
@@ -109,6 +125,7 @@ export function parseWebhook(json: unknown, now = Date.now()): TenantBatch[] | n
           at: metaDate(m.timestamp, now),
           type: clean(m.type, 30) || "unknown",
           body: raw === null ? null : clean(raw, 4096),
+          ...(img ?? {}),
         });
       }
       for (const s of change.value.statuses ?? []) {

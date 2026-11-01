@@ -17,7 +17,8 @@ export const GET = route(async (req) => {
   const { tenantId } = auth.ctx;
   const data = await withTenant(tenantId, async (db) => {
     const orders = await db.query(
-      `SELECT id, number, status, source, customer_name, customer_phone, notes, delivery_note, currency, total_minor, conversation_id, created_at, confirmed_at, delivered_at, cancelled_at
+      `SELECT id, number, status, source, customer_name, customer_phone, notes, delivery_note, currency, total_minor, conversation_id, created_at, confirmed_at, delivered_at, cancelled_at,
+              payment_state, paid_at, payment_method, (proof_message_id IS NOT NULL) AS has_proof
          FROM orders WHERE tenant_id = $1 AND ($2::text IS NULL OR status = $2) AND ($3::int IS NULL OR number < $3)
         ORDER BY number DESC LIMIT $4`,
       [tenantId, q.data.status ?? null, q.data.before ?? null, PAGE + 1],
@@ -37,6 +38,7 @@ export const GET = route(async (req) => {
     orders: data.page.map((o) => ({
       id: o.id, number: o.number, status: o.status, source: o.source, customerName: o.customer_name, customerPhone: o.customer_phone,
       notes: o.notes, deliveryNote: o.delivery_note, currency: o.currency, totalMinor: Number(o.total_minor), conversationId: o.conversation_id,
+      paymentState: o.payment_state, paidAt: o.paid_at, paymentMethod: o.payment_method, hasProof: o.has_proof === true,
       createdAt: o.created_at, confirmedAt: o.confirmed_at, deliveredAt: o.delivered_at, cancelledAt: o.cancelled_at,
       items: data.items.filter((i) => i.order_id === o.id).map((i) => ({ name: i.name, unit: i.unit, unitPriceMinor: Number(i.unit_price_minor), quantity: i.quantity, lineTotalMinor: Number(i.line_total_minor) })),
     })),
