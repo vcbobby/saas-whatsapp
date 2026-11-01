@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BUSINESS_TYPE_INFO, BUSINESS_TYPES, COUNTRY_CODES, COUNTRY_INFO, EMOJI_LABEL, EMOJI_LEVELS, TONE_LABEL, TONES, type BusinessType, type CountryCode, type EmojiLevel, type Tone } from "@/lib/agent/style";
 import { CURRENCY_INFO, parseMoney } from "@/lib/catalog/money";
@@ -20,7 +19,6 @@ const blankProduct = (): ProductRow => ({ name: "", price: "" });
 
 /** Asistente de bienvenida: 5 pantallas que dejan la cuenta lista para usar. */
 export function Welcome({ businessName, modules }: Props) {
-  const router = useRouter();
   const [step, setStep] = useState(0);
   const [type, setType] = useState<BusinessType>(modules.includes("agenda") ? "citas" : modules.includes("catalogo") ? "catalogo" : "atencion");
   const [country, setCountry] = useState<CountryCode>("VE");
@@ -103,7 +101,8 @@ export function Welcome({ businessName, modules }: Props) {
       const res = await fetch("/api/onboarding", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
       const data = (await res.json().catch(() => ({}))) as { message?: string };
       if (res.ok) setDone(true);
-      else if (res.status === 409) router.replace("/panel");
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- carga completa a propósito (el enrutador guarda «/panel» como redirección a /bienvenida)
+      else if (res.status === 409) window.location.assign("/panel");
       else setError(data.message ?? "No se pudo guardar. Intenta de nuevo.");
     } catch {
       setError("No hay conexión con el servidor. Revisa tu internet e intenta de nuevo.");
@@ -114,7 +113,8 @@ export function Welcome({ businessName, modules }: Props) {
 
   async function skip() {
     setBusy(true);
-    try { await fetch("/api/onboarding/skip", { method: "POST" }); } finally { router.replace("/panel"); }
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- carga completa a propósito (el enrutador guarda «/panel» como redirección a /bienvenida)
+    try { await fetch("/api/onboarding/skip", { method: "POST" }); } finally { window.location.assign("/panel"); } // carga completa: el enrutador pudo guardar «/panel» como redirección a /bienvenida
   }
 
   if (done) {

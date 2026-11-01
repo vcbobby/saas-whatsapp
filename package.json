@@ -17,7 +17,8 @@
     "dev:all": "node scripts/dev-all.mjs",
     "db:extensions": "docker compose --env-file .env.local exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -c \"CREATE EXTENSION IF NOT EXISTS vector\"'",
     "kb:model": "tsx --env-file=.env.local scripts/kb-model.ts",
-    "ai:check": "tsx --env-file=.env.local scripts/probar-ia.ts"
+    "ai:check": "tsx --env-file=.env.local scripts/probar-ia.ts",
+    "test:e2e": "node --test --test-concurrency=1 e2e/flujos.test.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.1",
@@ -42,6 +43,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.4.0",
+    "playwright": "^1.56.0",
     "tailwindcss": "^4",
     "tsx": "4.23.14",
     "typescript": "^5",

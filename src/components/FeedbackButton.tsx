@@ -39,8 +39,8 @@ export function FeedbackButton() {
 
   return (
     <>
-      <button type="button" className="btn btn-sm btn-ghost-light" onClick={open}>Enviar comentario</button>
-      <dialog ref={ref} aria-labelledby={`${uid}-t`} className="card p-6" style={{ maxWidth: 480, width: "calc(100% - 32px)" }}>
+      <button type="button" className="btn btn-sm btn-ghost-dark" onClick={open}>Enviar comentario</button>
+      <dialog ref={ref} aria-labelledby={`${uid}-t`} className="card m-auto p-6" style={{ maxWidth: 480, width: "calc(100% - 32px)", color: "inherit" }}>
         <form onSubmit={send} className="flex flex-col gap-4">
           <h2 id={`${uid}-t`} className="text-[20px]">Cuéntanos qué piensas</h2>
           <fieldset className="flex flex-wrap gap-3">
@@ -58,7 +58,7 @@ export function FeedbackButton() {
           {msg && <p role={msg.ok ? "status" : "alert"} className="text-[14px]">{msg.text}</p>}
           <div className="flex gap-3">
             <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>{busy ? "Enviando…" : "Enviar"}</button>
-            <button type="button" className="btn btn-sm btn-ghost-light" onClick={close}>Cerrar</button>
+            <button type="button" className="btn btn-sm btn-ghost-dark" onClick={close}>Cerrar</button>
           </div>
         </form>
       </dialog>
