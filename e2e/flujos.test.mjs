@@ -190,3 +190,33 @@ describe("pantalla de celular", () => {
 });
 
 console.log(`(pruebas de navegador contra ${BASE})`);
+
+describe("avisos al cliente", () => {
+  it("activa la receta de pago, marca un pedido como pagado y el aviso aparece en la lista", T, async () => {
+    const { page, errores } = await conNegocio("Tienda Avisos");
+    await ir(page, "/datos", "Importar y exportar");
+    await page.getByRole("button", { name: "Cargar datos de ejemplo" }).click();
+    await page.getByText(/ya puedes recorrer el panel/i).waitFor({ timeout: 60_000 });
+
+    await ir(page, "/automatizaciones", "Automatizaciones");
+    await page.getByRole("button", { name: /Avisar que recibimos el pago/ }).click();
+    await page.getByLabel("Mensaje para el cliente").waitFor({ timeout: 30_000 });
+    await captura(page, "15-receta-pago");
+    await page.getByRole("button", { name: "Crear regla" }).click();
+    await page.getByRole("heading", { level: 2, name: "Pago recibido" }).waitFor({ timeout: 60_000 });
+
+    await ir(page, "/pedidos", "Pedidos");
+    await page.getByRole("button", { name: /^Confirmados/ }).click();
+    await page.getByText(/Pedido #\d+ · Ana Pérez/).waitFor({ timeout: 60_000 });
+    await page.getByRole("button", { name: "Marcar como pagado" }).first().click();
+    await page.getByText(/recibe un aviso al pagar|reciba un aviso al pagar/).waitFor({ timeout: 30_000 }); // recordatorio hacia Automatizaciones
+    await page.getByRole("button", { name: "Confirmar pago" }).click();
+    await page.getByText(/^Pagado/).first().waitFor({ timeout: 60_000 });
+
+    await ir(page, "/automatizaciones", "Automatizaciones");
+    await page.getByRole("heading", { level: 2, name: "Últimos avisos a clientes" }).waitFor({ timeout: 60_000 });
+    await page.getByText(/Hola Ana Pérez \(ejemplo\), recibimos tu pago del pedido #\d+/).waitFor({ timeout: 60_000 });
+    await captura(page, "16-aviso-de-pago");
+    sinErrores(errores);
+  });
+});
