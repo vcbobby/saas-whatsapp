@@ -24,7 +24,7 @@ export const GET = route(async (req) => {
     );
     if (c.rowCount !== 1) return null;
     const msgs = await db.query(
-      `SELECT id, direction, msg_type, body, delivery_status, received_at, sent_by,
+      `SELECT id, direction, msg_type, body, delivery_status, received_at, sent_by, (media_id IS NOT NULL) AS has_media,
               CASE WHEN send_state = 'sending' AND received_at < now() - interval '2 minutes' THEN 'unknown' ELSE send_state END AS send_state
          FROM (
          SELECT * FROM messages WHERE tenant_id = $1 AND conversation_id = $2
@@ -71,6 +71,7 @@ export const GET = route(async (req) => {
       sender: m.direction === "in" ? "customer" : m.sent_by === null ? "assistant" : m.sent_by === auth.session.userId ? "me" : "team",
       type: m.msg_type,
       body: m.body,
+      hasMedia: m.has_media === true,
       sendState: m.send_state,
       deliveryStatus: m.delivery_status,
       at: m.received_at,

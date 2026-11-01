@@ -17,6 +17,7 @@ import { getEmbedder, type Embedder } from "@/lib/kb/embeddings";
 import { searchKnowledge, type Snippet } from "@/lib/kb/search";
 import { AGENDA_RULES_LINES, bookingTexts, buildMenu, createAgentAppointment, parseBookingRequest, stripBookingMarkers, whenLabel, type AgendaMenu } from "./booking";
 import { ORDER_RULES_LINES, buildCatalogMenu, createAgentOrder, orderTexts, parseOrderRequest, stripOrderMarkers, type CatalogMenu } from "./ordering";
+import { isProofMessage } from "@/lib/payments/proof";
 import { hoursContext, type HoursContext } from "@/lib/hours/agent";
 import { allowedContacts, checkOutput, looksLikeInjection, newCanary } from "./safety";
 
@@ -275,7 +276,9 @@ async function attend(job: InboundJob, deps: Partial<AgentDeps>): Promise<AgentO
   const hours: HoursContext | null = await hoursContext(tenantId);
   let handoffReason = "pedido_de_persona";
   if (!(TEXT_TYPES.has(ctx.msgType) && ctx.body)) {
-    text = fixed.nonText;
+    // Una imagen que quedó como posible comprobante de pago se agradece; cualquier otro archivo recibe el aviso de siempre.
+    const proof = ctx.msgType === "image" && (await withTenant(tenantId, (db) => isProofMessage(db, tenantId, ctx.messageId)));
+    text = proof ? fixed.proofReceived : fixed.nonText;
   } else if (contactLimited) {
     await recordEvent(tenantId, ctx.conversationId, ctx.messageId, "limite_contacto");
     text = fixed.rateLimited;

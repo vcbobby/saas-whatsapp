@@ -113,7 +113,7 @@ export function styleFromRow(r: Record<string, unknown> | undefined): AgentStyle
   };
 }
 
-export interface FixedTexts { handoff: string; nonText: string; fallback: string; rateLimited: string }
+export interface FixedTexts { handoff: string; nonText: string; fallback: string; rateLimited: string; proofReceived: string }
 
 const FIXED_BY_TREATMENT: Record<Treatment, FixedTexts> = {
   tu: {
@@ -121,18 +121,21 @@ const FIXED_BY_TREATMENT: Record<Treatment, FixedTexts> = {
     nonText: "Por ahora solo puedo leer mensajes de texto. ¿Me cuentas por escrito en qué te puedo ayudar?",
     fallback: "Disculpa, no pude procesar tu mensaje. Una persona de nuestro equipo te escribirá pronto.",
     rateLimited: "Estás escribiendo muy seguido y por ahora no puedo seguir atendiéndote por aquí. Una persona de nuestro equipo te responderá en cuanto pueda.",
+    proofReceived: "¡Gracias! Recibimos tu comprobante. Una persona de nuestro equipo lo verificará y te confirma por aquí.",
   },
   usted: {
     handoff: "Claro, le comunico con una persona de nuestro equipo. En cuanto pueda le responde por aquí.",
     nonText: "Por ahora solo puedo leer mensajes de texto. ¿Me cuenta por escrito en qué le puedo ayudar?",
     fallback: "Disculpe, no pude procesar su mensaje. Una persona de nuestro equipo le escribirá pronto.",
     rateLimited: "Está escribiendo muy seguido y por ahora no puedo continuar la atención por aquí. Una persona de nuestro equipo le responderá en cuanto pueda.",
+    proofReceived: "¡Gracias! Recibimos su comprobante. Una persona de nuestro equipo lo verificará y le confirma por aquí.",
   },
   vos: {
     handoff: "Claro, te comunico con una persona de nuestro equipo. En cuanto pueda te responde por acá.",
     nonText: "Por ahora solo puedo leer mensajes de texto. ¿Me contás por escrito en qué te puedo ayudar?",
     fallback: "Disculpá, no pude procesar tu mensaje. Una persona de nuestro equipo te va a escribir pronto.",
     rateLimited: "Estás escribiendo muy seguido y por ahora no puedo seguir atendiéndote por acá. Una persona de nuestro equipo te va a responder en cuanto pueda.",
+    proofReceived: "¡Gracias! Recibimos tu comprobante. Una persona de nuestro equipo lo va a verificar y te confirma por acá.",
   },
 };
 

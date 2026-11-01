@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { formatMoney, type Currency } from "@/lib/catalog/money";
+import { OrderPayment, type PaymentState } from "./OrderPayment";
 import { EmptyState } from "@/components/EmptyState";
 
 type Status = "pendiente" | "confirmado" | "entregado" | "cancelado";
 interface Item { name: string; unit: string | null; unitPriceMinor: number; quantity: number; lineTotalMinor: number }
-interface Order { id: string; number: number; status: Status; source: "manual" | "agente"; customerName: string; customerPhone: string | null; notes: string | null; deliveryNote: string | null; currency: Currency; totalMinor: number; createdAt: string; items: Item[] }
+interface Order { id: string; number: number; status: Status; source: "manual" | "agente"; customerName: string; customerPhone: string | null; notes: string | null; deliveryNote: string | null; currency: Currency; totalMinor: number; createdAt: string; paymentState: PaymentState; paymentMethod: string | null; hasProof: boolean; items: Item[] }
 interface Product { id: string; name: string; unit: string | null; priceMinor: number; stock: number | null; active: boolean }
 type Counts = Record<Status, number>;
 
@@ -138,6 +139,9 @@ export function OrdersManager() {
               <p className="mt-3 text-right font-medium">Total {formatMoney(o.totalMinor, o.currency)}</p>
               {o.deliveryNote && <p className="muted mt-2 text-[14px]">Entrega: {o.deliveryNote}</p>}
               {o.notes && <p className="muted mt-1 text-[14px]">Notas: {o.notes}</p>}
+              {o.status !== "cancelado" && (
+                <OrderPayment id={o.id} state={o.paymentState} hasProof={o.hasProof} method={o.paymentMethod} cancelled={false} onChanged={() => load(filter)} />
+              )}
               {(o.status === "pendiente" || o.status === "confirmado") && (
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {o.status === "pendiente" && <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void act(o.id, "confirm")}>Confirmar</button>}
