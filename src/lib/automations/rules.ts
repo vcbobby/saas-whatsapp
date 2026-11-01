@@ -26,7 +26,7 @@ export const STATUS_OPTIONS = {
 export const PLACEHOLDERS = ["{cliente}", "{numero}", "{servicio}", "{total}", "{estado}", "{fecha}", "{producto}", "{stock}"] as const;
 export const ACTIONS = ["tarea", "mensaje", "app"] as const;
 /** Avisos con un cliente al que se le puede escribir (la conversación de «pasa a una persona» no). */
-export const MESSAGE_TRIGGERS = ["order.created", "order.status_changed", "appointment.created", "appointment.status_changed", "appointment.rescheduled", "appointment.upcoming", "order.pending_stale"] as const;
+export const MESSAGE_TRIGGERS = ["order.created", "order.status_changed", "appointment.created", "appointment.status_changed", "appointment.rescheduled", "appointment.upcoming", "order.pending_stale", "order.paid", "order.payment_rejected"] as const;
 
 export const ruleFields = {
   name: z.string().trim().min(1, "Ponle un nombre a la regla").max(80, "Máximo 80 caracteres"),

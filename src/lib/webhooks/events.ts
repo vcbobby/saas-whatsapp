@@ -1,5 +1,5 @@
 // Catálogo de eventos que un negocio puede mandar a otros sistemas (sin dependencias: lo usan servidor y pantallas).
-// Debe coincidir con el CHECK de webhook_endpoints.events (migración 0038).
+// Debe coincidir con el CHECK de webhook_endpoints.events (migración 0055).
 export const WEBHOOK_EVENTS = [
   "order.created",
   "order.status_changed",
@@ -9,6 +9,8 @@ export const WEBHOOK_EVENTS = [
   "conversation.handoff",
   "contact.created",
   "stock.low",
+  "order.paid",
+  "order.payment_rejected",
 ] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
@@ -20,6 +22,8 @@ export const WEBHOOK_EVENT_LABEL: Record<WebhookEvent, { title: string; hint: st
   "appointment.rescheduled": { title: "Cita reprogramada", hint: "Cambia la fecha u hora de una cita." },
   "conversation.handoff": { title: "Pasa a una persona", hint: "El asistente pasa una conversación a tu equipo." },
   "contact.created": { title: "Cliente nuevo", hint: "Alguien te escribe por primera vez por WhatsApp." },
+  "order.paid": { title: "Pedido pagado", hint: "Marcas un pedido como pagado (cuando llega el pago o confirmas un comprobante)." },
+  "order.payment_rejected": { title: "Comprobante rechazado", hint: "Rechazas el comprobante de un pedido: sirve para pedirle al cliente otro." },
   "stock.low": { title: "Producto con poco stock o agotado", hint: "Un producto baja de su mínimo o se agota (una sola vez, no se repite mientras siga bajo)." },
 };
 
