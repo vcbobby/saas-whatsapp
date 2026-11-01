@@ -22,10 +22,13 @@ export function formatEventText(type: string, payload: unknown): string {
   let t: string;
   switch (type) {
     case "order.created":
-    case "order.status_changed": {
+    case "order.status_changed":
+    case "order.paid":
+    case "order.payment_rejected": {
       const o = obj(data.order);
       const items = Array.isArray(o.items) ? (o.items as unknown[]).slice(0, 8).map((i) => `• ${str(obj(i).quantity, 6)} × ${str(obj(i).name, 60)}`).join("\n") : "";
-      const head = type === "order.created" ? "🛒 Pedido nuevo" : `📦 Pedido cambió a «${st(o.status)}»`;
+      const pay = obj(data.payment);
+      const head = type === "order.created" ? "🛒 Pedido nuevo" : type === "order.paid" ? `💵 Pedido pagado${pay.method ? ` (${str(pay.method, 40)})` : ""}` : type === "order.payment_rejected" ? "⚠️ Comprobante rechazado" : `📦 Pedido cambió a «${st(o.status)}»`;
       t = [`${head} #${str(o.number, 12)}`, `Cliente: ${str(o.customer_name) || "—"}${o.customer_phone ? ` (${str(o.customer_phone, 24)})` : ""}`, items, `Total: ${money(o.total_minor, o.currency) || "—"}`, o.delivery_note ? `Nota: ${str(o.delivery_note, 200)}` : ""].filter(Boolean).join("\n");
       break;
     }

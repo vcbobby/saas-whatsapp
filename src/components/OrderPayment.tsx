@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { postJson } from "@/lib/client";
 
@@ -67,6 +68,7 @@ export function OrderPayment({ id, state, hasProof, method, cancelled, onChanged
               </select>
               <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void act("pagado")}>Confirmar pago</button>
               <button type="button" className="btn btn-sm btn-ghost-light" onClick={() => setPick(false)}>Cancelar</button>
+              <span className="muted w-full text-[13px]">¿Quieres que el cliente reciba un aviso al pagar? Activa la receta «Avisar que recibimos el pago» en <Link href="/automatizaciones" className="link">Automatizaciones</Link>.</span>
             </span>
           )}
           {state === "por_verificar" && <button type="button" className="btn btn-sm btn-ghost-light" disabled={busy} onClick={() => void act("rechazar")}>No es un pago válido</button>}
