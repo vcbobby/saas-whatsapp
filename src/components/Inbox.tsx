@@ -334,7 +334,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
                   </span>
                   <span className="mt-2 flex flex-wrap gap-2">
                     {r.needsAttention && <span className="badge" style={urgent}>Necesita atención</span>}
-                    {r.status !== "bot" && <span className="badge" style={chip}>{CONVERSATION_STATUS_LABEL[r.status]}</span>}
+                    <span className="badge" style={chip}>{r.status === "bot" ? "🤖 Asistente" : r.status === "human" ? "🧑 Persona" : "Cerrada"}</span>
                     {r.contact.label !== "sin_clasificar" && <span className="badge" style={chip}>{CONTACT_LABEL_TEXT[r.contact.label].replace(" (el asistente no responde)", "")}</span>}
                   </span>
                 </button>
@@ -395,14 +395,17 @@ export function Inbox({ initialId }: { initialId: string | null }) {
             )}
 
             <div className="mt-5 flex flex-wrap items-center gap-2">
-              {c.status !== "closed" && !(c.status === "human" && c.assignedToMe) && (
+              {c.status !== "closed" && (
+                <div role="group" aria-label="Quién responde esta conversación" className="flex overflow-hidden rounded-full" style={{ border: "1px solid var(--color-ink)" }}>
+                  <button type="button" aria-pressed={c.status === "bot"} disabled={busy} className="btn btn-sm" style={{ borderRadius: 0, ...(c.status === "bot" ? { background: "var(--color-ink)", color: "var(--color-pure-white)" } : { background: "transparent", color: "var(--color-ink)" }) }}
+                    onClick={() => { if (c.status === "human") void act({ action: "release" }); }}>🤖 Asistente</button>
+                  <button type="button" aria-pressed={c.status === "human"} disabled={busy} className="btn btn-sm" style={{ borderRadius: 0, ...(c.status === "human" ? { background: "var(--color-ink)", color: "var(--color-pure-white)" } : { background: "transparent", color: "var(--color-ink)" }) }}
+                    onClick={() => { if (c.status === "bot") void act({ action: "take" }); }}>🧑 Persona</button>
+                </div>
+              )}
+              {c.status === "human" && !c.assignedToMe && (
                 <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => void act({ action: "take" })}>
                   Tomar la conversación
-                </button>
-              )}
-              {c.status === "human" && (
-                <button type="button" className="btn btn-sm btn-ghost-light" disabled={busy} onClick={() => void act({ action: "release" })}>
-                  Devolver al asistente
                 </button>
               )}
               {c.status !== "closed" &&
@@ -417,6 +420,11 @@ export function Inbox({ initialId }: { initialId: string | null }) {
                 ))}
             </div>
             <div role="alert" aria-live="assertive">{error && <p className="alert-error mt-4">{error}</p>}</div>
+            {c.status !== "closed" && (
+              <p className="muted mt-2 text-[14px]" role="status">
+                {c.status === "bot" ? "El asistente le responde solo a este cliente. Pulsa «Persona» para pausarlo y contestar tú." : c.assignedToMe ? "El asistente está en pausa: contestas tú. Pulsa «Asistente» para devolvérselo." : "El asistente está en pausa: la atiende una persona de tu equipo."}
+              </p>
+            )}
 
             <div className="mt-6 flex max-h-[60vh] flex-col gap-3 overflow-y-auto rounded-[20px] p-4" style={{ background: "var(--color-pure-white)", border: "1px solid var(--color-fog-border)" }} role="log" aria-label="Mensajes" tabIndex={0}>
               {detail!.messages.length === 0 && <p className="muted text-[14px]">Todavía no hay mensajes.</p>}
@@ -489,7 +497,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
                   );
                 })()
               ) : (
-                <p className="muted mt-4 text-[14px]">Para responder desde aquí, toma la conversación: el asistente dejará de contestar mientras la tengas.</p>
+                <p className="muted mt-4 text-[14px]">Para responder desde aquí, pulsa «Persona» arriba: el asistente dejará de contestar mientras tanto.</p>
               ))}
             <div role="alert" aria-live="assertive">{replyError && <p className="alert-error mt-3">{replyError}</p>}</div>
             <form className="mt-6" onSubmit={(e) => { e.preventDefault(); void addNote(); }}>

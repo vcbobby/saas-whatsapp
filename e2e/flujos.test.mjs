@@ -220,3 +220,27 @@ describe("avisos al cliente", () => {
     sinErrores(errores);
   });
 });
+
+describe("quién responde", () => {
+  it("cambia una conversación entre el asistente y una persona con el interruptor", T, async () => {
+    const { page, errores } = await conNegocio("Tienda Interruptor");
+    await ir(page, "/datos", "Importar y exportar");
+    await page.getByRole("button", { name: "Cargar datos de ejemplo" }).click();
+    await page.getByText(/ya puedes recorrer el panel/i).waitFor({ timeout: 60_000 });
+    await ir(page, "/conversaciones", "Conversaciones");
+    await page.getByText("Ana Pérez (ejemplo)").first().click();
+    const grupo = page.getByRole("group", { name: "Quién responde esta conversación" });
+    await grupo.waitFor({ timeout: 60_000 });
+    const asistente = grupo.getByRole("button", { name: /Asistente/ });
+    const persona = grupo.getByRole("button", { name: /Persona/ });
+    assert.equal(await asistente.getAttribute("aria-pressed"), "true");
+    await persona.click();
+    await page.getByText(/El asistente está en pausa: contestas tú/).waitFor({ timeout: 60_000 });
+    assert.equal(await persona.getAttribute("aria-pressed"), "true");
+    await captura(page, "17-interruptor-persona");
+    await asistente.click();
+    await page.getByText(/El asistente le responde solo a este cliente/).waitFor({ timeout: 60_000 });
+    assert.equal(await asistente.getAttribute("aria-pressed"), "true");
+    sinErrores(errores);
+  });
+});

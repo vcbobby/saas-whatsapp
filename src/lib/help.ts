@@ -107,7 +107,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     id: "conversaciones", title: "Conversaciones", summary: "Todos los chats con tus clientes, en un solo lugar.",
     steps: [
       "Mientras una conversación está en modo asistente, él responde solo.",
-      "Pulsa «Tomar la conversación» para que el asistente deje de responder y escribas tú. Al terminar, «Devolver al asistente».",
+      "Pulsa «🧑 Persona» (arriba de la conversación) para que el asistente deje de responder y escribas tú. Al terminar, pulsa «🤖 Asistente». En la lista ves de un vistazo quién atiende cada chat.",
       "Puedes etiquetar a cada contacto (por ejemplo cliente frecuente o proveedor) para decidir si el asistente le responde.",
       "Los filtros de arriba separan lo activo de lo cerrado.",
       "«Nota privada» guarda un comentario dentro de la conversación (por ejemplo «pidió descuento, consultar al dueño»). Solo lo ve tu equipo y nunca llega al cliente.",
@@ -258,7 +258,7 @@ export const HELP_TOPICS: HelpTopic[] = [
 
 export const HELP_FAQ: { q: string; a: string }[] = [
   { q: "El asistente no responde. ¿Qué reviso?", a: "Que el asistente esté activado (Mi asistente), que tu WhatsApp esté conectado, que la conversación no esté tomada por una persona, y que no hayas llegado al tope mensual de respuestas de tu plan (lo ves en Inicio)." },
-  { q: "¿Puedo escribirle yo a un cliente?", a: "Sí. En Conversaciones pulsa «Tomar la conversación»: el asistente se pausa y escribes tú. Cuando termines, «Devolver al asistente»." },
+  { q: "¿Puedo escribirle yo a un cliente?", a: "Sí. En Conversaciones pulsa «🧑 Persona»: el asistente se pausa y escribes tú. Cuando termines, pulsa «🤖 Asistente»." },
   { q: "¿El asistente puede inventar precios o datos?", a: "Está limitado a lo que tú le escribes (información del negocio, Conocimiento, servicios y catálogo). Si no tiene el dato, debe decirlo y ofrecer pasar con una persona. Aun así, pruébalo en «Probar» y revisa las primeras conversaciones reales." },
   { q: "¿Qué pasa si mi plan vence?", a: "Tu cuenta puede quedar suspendida y el asistente dejaría de responder hasta que renueves. En Plan y pagos ves la fecha de vencimiento para renovar a tiempo." },
   { q: "¿Cómo cambio el nombre de mi negocio o mi contraseña?", a: "El nombre está en Mi cuenta; la contraseña, en Seguridad." },

@@ -17,16 +17,20 @@ export async function cerrarNavegador() {
   browser = undefined;
 }
 
+/** Ruido propio de las herramientas de desarrollo de React/Next (solo con `npm run dev`; no existe en producción). No es un fallo de la app. */
+const RUIDO_DE_DESARROLLO = /Failed to execute 'measure' on 'Performance'.*negative time stamp/;
+
 /** Una persona nueva: contexto limpio (sin cookies), con vigilancia de errores de la página. */
 export async function nuevaPersona({ movil = false } = {}) {
   const b = await abrirNavegador();
   const context = await b.newContext({ baseURL: BASE, locale: "es-VE", viewport: movil ? { width: 390, height: 800 } : { width: 1280, height: 800 } });
   const page = await context.newPage();
   const errores = [];
-  page.on("pageerror", (e) => errores.push(`error de página: ${e.message}`));
+  page.on("pageerror", (e) => { if (!RUIDO_DE_DESARROLLO.test(e.message)) errores.push(`error de página: ${e.message}`); });
   page.on("console", (m) => {
     if (m.type() !== "error") return;
     const t = m.text();
+    if (RUIDO_DE_DESARROLLO.test(t)) return;
     if (/favicon|Failed to load resource.*(40[0-9]|50[0-9])|net::ERR_/.test(t)) return; // respuestas de error esperadas en algunas pruebas
     errores.push(`consola: ${t}`);
   });
