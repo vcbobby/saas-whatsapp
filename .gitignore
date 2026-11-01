@@ -181,3 +181,8 @@ next-env.d.ts
 .paso43-backup/
 
 .paso44-backup/
+
+.paso45-backup/
+
+# Capturas de las pruebas en navegador
+e2e/capturas/

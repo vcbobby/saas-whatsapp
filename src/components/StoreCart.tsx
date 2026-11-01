@@ -26,9 +26,9 @@ export function StoreCart({ business, phone, currency, products }: { business: s
                 <p className="text-[16px]">{formatMoney(p.priceMinor, currency)}{p.unit ? <span className="muted-dark text-[14px]"> / {p.unit}</span> : null}</p>
                 {p.soldOut ? <p className="text-[14px] muted-dark">Agotado</p> : (
                   <div className="mt-auto flex items-center gap-3">
-                    <button type="button" className="btn btn-sm btn-ghost-light" aria-label={`Quitar uno de ${p.name}`} disabled={n === 0} onClick={() => set(p.id, n - 1)}>−</button>
+                    <button type="button" className="btn btn-sm btn-ghost-dark" aria-label={`Quitar uno de ${p.name}`} disabled={n === 0} onClick={() => set(p.id, n - 1)}>−</button>
                     <span aria-live="polite" className="min-w-6 text-center">{n}</span>
-                    <button type="button" className="btn btn-sm btn-ghost-light" aria-label={`Agregar uno de ${p.name}`} onClick={() => set(p.id, n + 1)}>+</button>
+                    <button type="button" className="btn btn-sm btn-ghost-dark" aria-label={`Agregar uno de ${p.name}`} onClick={() => set(p.id, n + 1)}>+</button>
                   </div>
                 )}
               </li>
