@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CONTACT_LABELS, CONTACT_LABEL_TEXT, CONVERSATION_STATUS_LABEL, MEDIA_LABEL, WORK_TYPE_LABEL, type ContactLabel, type WorkType } from "@/lib/work/labels";
 import { postJson } from "@/lib/client";
+import { originText } from "@/lib/origin";
 import { messageTime, relativeTime } from "@/lib/work/time";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -32,7 +33,7 @@ interface Msg {
   at: string;
 }
 interface Detail {
-  conversation: { id: string; status: Status; handoffReason: string | null; assignedToMe: boolean; assignedName: string | null; replyUntil: string | null; contact: { id: string; name: string; waId: string; label: ContactLabel } };
+  conversation: { id: string; status: Status; handoffReason: string | null; assignedToMe: boolean; assignedName: string | null; replyUntil: string | null; contact: { id: string; name: string; waId: string; label: ContactLabel; origin: { type: "anuncio" | "publicacion"; headline: string | null } | null } };
   messages: Msg[];
   notes: { id: string; author: string; body: string; at: string }[];
   work: { id: string; type: WorkType; title: string }[];
@@ -373,6 +374,7 @@ export function Inbox({ initialId }: { initialId: string | null }) {
               <div>
                 <h2 className="text-[24px]">{c.contact.name}</h2>
                 <p className="muted mt-1 text-[14px]">+{c.contact.waId} · {CONVERSATION_STATUS_LABEL[c.status]}{c.status === "human" && c.assignedToMe ? " · la tienes tú" : c.status === "human" && c.assignedName ? ` · la atiende ${c.assignedName}` : ""} · <Link href={`/clientes/${c.contact.id}`} className="link">Ver ficha</Link></p>
+                {c.contact.origin && <p className="mt-1 text-[14px]">📣 {originText(c.contact.origin.type, c.contact.origin.headline)}</p>}
               </div>
               <div className="field" style={{ minWidth: 220 }}>
                 <label htmlFor={`${uid}-tipo`}>Tipo de contacto</label>

@@ -40,6 +40,14 @@ export interface InboundMessage {
   /** Imagen recibida: id de Meta para descargarla después y su tipo (solo JPG, PNG o WebP). */
   mediaId?: string | null;
   mediaMime?: string | null;
+  /** Primer mensaje desde un anuncio de «Click to WhatsApp» o una publicación (Meta manda «referral»). */
+  origin?: InboundOrigin | null;
+}
+export interface InboundOrigin {
+  type: "anuncio" | "publicacion";
+  sourceId: string | null;
+  url: string | null;
+  headline: string | null;
 }
 export interface StatusUpdate {
   waMessageId: string;
@@ -75,6 +83,18 @@ function imageOf(m: Record<string, unknown>): { mediaId: string; mediaMime: stri
   const id = part.id, mime = typeof part.mime_type === "string" ? part.mime_type.toLowerCase().split(";")[0]!.trim() : "";
   if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,200}$/.test(id) || !IMAGE_MIMES.has(mime)) return null;
   return { mediaId: id, mediaMime: mime };
+}
+
+/** Origen del cliente según el «referral» de Meta; null si no viene o no es de un anuncio/publicación. Nada de esto se confía: se limpia y se recorta. */
+export function originOf(m: Record<string, unknown>): InboundOrigin | null {
+  const r = m.referral as Record<string, unknown> | undefined;
+  if (!r || typeof r !== "object") return null;
+  const type = r.source_type === "ad" ? "anuncio" : r.source_type === "post" ? "publicacion" : null;
+  if (!type) return null;
+  const str = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? clean(v, max) : null);
+  const sourceId = typeof r.source_id === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(r.source_id) ? r.source_id : null;
+  const url = typeof r.source_url === "string" && /^https:\/\/[^\s]{1,480}$/.test(r.source_url) ? r.source_url : null;
+  return { type, sourceId, url, headline: str(r.headline, 200) };
 }
 
 function bodyOf(m: Record<string, unknown>): string | null {
@@ -126,6 +146,7 @@ export function parseWebhook(json: unknown, now = Date.now()): TenantBatch[] | n
           type: clean(m.type, 30) || "unknown",
           body: raw === null ? null : clean(raw, 4096),
           ...(img ?? {}),
+          origin: originOf(m),
         });
       }
       for (const s of change.value.statuses ?? []) {

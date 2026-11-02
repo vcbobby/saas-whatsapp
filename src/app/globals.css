@@ -222,3 +222,7 @@ h1, h2, h3 {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* Botón secundario: toma el color del texto de donde esté (sirve en fondos oscuros y claros). */
+.btn-secondary { border-color: currentColor; color: inherit; background: transparent; }
+.btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, currentColor 10%, transparent); }

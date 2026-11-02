@@ -17,7 +17,7 @@ export const GET = route(async (req) => {
   const data = await withTenant(tenantId, async (db) => {
     const c = await db.query(
       `SELECT c.id, c.status, c.handoff_reason, c.assigned_to, c.last_message_at,
-              ct.id AS contact_id, ct.wa_id, ct.label, COALESCE(NULLIF(ct.display_name, ''), '+' || ct.wa_id) AS contact_name
+              ct.id AS contact_id, ct.wa_id, ct.label, ct.origin_type, ct.origin_headline, COALESCE(NULLIF(ct.display_name, ''), '+' || ct.wa_id) AS contact_name
          FROM conversations c JOIN contacts ct ON ct.tenant_id = c.tenant_id AND ct.id = c.contact_id
         WHERE c.tenant_id = $1 AND c.id = $2`,
       [tenantId, id.data],
@@ -63,7 +63,7 @@ export const GET = route(async (req) => {
       assignedToMe: c.assigned_to === auth.session.userId,
       assignedName,
       replyUntil: windowEnd(data.lastInbound)?.toISOString() ?? null,
-      contact: { id: c.contact_id, name: c.contact_name, waId: c.wa_id, label: c.label },
+      contact: { id: c.contact_id, name: c.contact_name, waId: c.wa_id, label: c.label, origin: c.origin_type ? { type: c.origin_type, headline: c.origin_headline ?? null } : null },
     },
     messages: data.msgs.map((m) => ({
       id: m.id,

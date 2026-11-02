@@ -30,12 +30,20 @@ export async function ingestBatch(batch: TenantBatch): Promise<IngestResult> {
     const inbound: { tenantId: string; messageId: string }[] = [];
 
     for (const m of batch.messages) {
+      const o = m.origin ?? null;
+      // El primer origen manda: si el contacto ya tenía uno, no se cambia (todos los campos se quedan juntos).
       const contact = await db.query<{ id: string }>(
-        `INSERT INTO contacts (tenant_id, wa_id, display_name) VALUES ($1, $2, $3)
+        `INSERT INTO contacts (tenant_id, wa_id, display_name, origin_type, origin_source_id, origin_url, origin_headline, origin_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $4::text IS NULL THEN NULL ELSE now() END)
          ON CONFLICT (tenant_id, wa_id)
-         DO UPDATE SET display_name = COALESCE(EXCLUDED.display_name, contacts.display_name)
+         DO UPDATE SET display_name = COALESCE(EXCLUDED.display_name, contacts.display_name),
+           origin_type = CASE WHEN contacts.origin_type IS NULL THEN EXCLUDED.origin_type ELSE contacts.origin_type END,
+           origin_source_id = CASE WHEN contacts.origin_type IS NULL THEN EXCLUDED.origin_source_id ELSE contacts.origin_source_id END,
+           origin_url = CASE WHEN contacts.origin_type IS NULL THEN EXCLUDED.origin_url ELSE contacts.origin_url END,
+           origin_headline = CASE WHEN contacts.origin_type IS NULL THEN EXCLUDED.origin_headline ELSE contacts.origin_headline END,
+           origin_at = CASE WHEN contacts.origin_type IS NULL THEN EXCLUDED.origin_at ELSE contacts.origin_at END
          RETURNING id`,
-        [tenantId, m.waId, m.name],
+        [tenantId, m.waId, m.name, o?.type ?? null, o?.sourceId ?? null, o?.url ?? null, o?.headline ?? null],
       );
       const contactId = contact.rows[0]!.id;
 

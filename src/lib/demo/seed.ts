@@ -52,6 +52,9 @@ export async function loadDemo(db: Db, tenantId: string, now: Date = new Date())
   const luis = await person(2, "Luis Gómez", "cliente", []);
   const marta = await person(3, "Marta Rojas", "cliente", ["mayorista"]);
   const jose = await person(4, "José Silva", "cliente", []);
+  // De dónde llegaron (para ver el reporte «¿De dónde llegaron tus clientes?» con datos).
+  await db.query("UPDATE contacts SET origin_type = 'anuncio', origin_headline = $3, origin_at = created_at WHERE tenant_id = $1 AND id = ANY($2::uuid[])", [T, [marta, luis], "Camisas y gorras 2x1 (ejemplo)"]);
+  await db.query("UPDATE contacts SET origin_type = 'publicacion', origin_at = created_at WHERE tenant_id = $1 AND id = $2", [T, jose]);
 
   const v1 = await conv(ana, "bot", t0 - 2 * DAY, null);
   const a1 = await say(v1, "in", t0 - 2 * DAY, "Hola, ¿tienen camisas disponibles?");
