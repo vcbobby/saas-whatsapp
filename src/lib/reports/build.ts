@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { originLabel } from "@/lib/origin";
 import { loadSettings } from "@/lib/agenda/load";
 import { addDays, localDate } from "@/lib/agenda/tz";
 import { dayRange } from "@/lib/summary/snapshot";
@@ -33,6 +34,11 @@ export async function buildReport(db: Db, tenantId: string, days: ReportDays = 7
   const cust = (await q<{ cur: number; prev: number }>(
     `SELECT count(*) FILTER (WHERE created_at >= $2 AND created_at < $3)::int AS cur, count(*) FILTER (WHERE created_at >= $4 AND created_at < $2)::int AS prev
        FROM contacts WHERE tenant_id = $1 AND created_at >= $4 AND created_at < $3`, [T, start, end, pStart]))[0]!;
+
+  const org = await q<{ type: "anuncio" | "publicacion"; h: string; n: number }>(
+    `SELECT origin_type AS type, COALESCE(origin_headline, '') AS h, count(*)::int AS n FROM contacts
+      WHERE tenant_id = $1 AND origin_type IS NOT NULL AND created_at >= $2 AND created_at < $3 GROUP BY 1, 2 ORDER BY n DESC, h LIMIT 5`, [T, start, end]);
+  const orgTotal = (await q<{ n: number }>("SELECT count(*)::int AS n FROM contacts WHERE tenant_id = $1 AND origin_type IS NOT NULL AND created_at >= $2 AND created_at < $3", [T, start, end]))[0]!.n;
 
   const hand = (await q<{ n: number }>("SELECT count(*)::int AS n FROM work_items WHERE tenant_id = $1 AND type = 'atencion_humana' AND created_at >= $2 AND created_at < $3", [T, start, end]))[0]!.n;
 
@@ -84,6 +90,8 @@ export async function buildReport(db: Db, tenantId: string, days: ReportDays = 7
     timezone: tz, from, to, days,
     conversations: msgs.cur_conv,
     newCustomers: { current: cust.cur, previous: cust.prev },
+    origins: org.map((o) => ({ label: originLabel(o.type, o.h), count: o.n })),
+    originTotal: orgTotal,
     inbound: { current: msgs.inbound, previous: msgs.prev_inbound },
     byAssistant: msgs.ai, byPerson: msgs.person,
     handoffs: hand, resolvedByAssistant: resolved,

@@ -2,7 +2,7 @@
 // Cada prueba crea su propio negocio, así que pueden repetirse sin limpiar nada.
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import { captura, cerrarNavegador, nuevaPersona, registrarse, BASE } from "./ayudas.mjs";
+import { botonesSinEstilo, captura, cerrarNavegador, nuevaPersona, registrarse, BASE } from "./ayudas.mjs";
 
 const T = { timeout: 240_000 };
 after(cerrarNavegador);
@@ -57,6 +57,7 @@ describe("datos de ejemplo y pantallas con movimiento", () => {
     await ir(page, "/datos", "Importar y exportar");
     await page.getByRole("button", { name: "Cargar datos de ejemplo" }).click();
     await page.getByText(/ya puedes recorrer el panel/i).waitFor({ timeout: 60_000 });
+    assert.deepEqual(await botonesSinEstilo(page), [], "hay botones que se ven como texto suelto en Datos");
     await captura(page, "02-datos");
 
     await ir(page, "/conversaciones", "Conversaciones");
@@ -70,6 +71,7 @@ describe("datos de ejemplo y pantallas con movimiento", () => {
     await captura(page, "04-clientes");
     await page.getByText("Marta Rojas (ejemplo)").click();
     await page.getByRole("heading", { level: 1, name: "Ficha de cliente" }).waitFor({ timeout: 60_000 });
+    await page.getByText(/Llegó desde un anuncio: «Camisas y gorras 2x1 \(ejemplo\)»/).waitFor({ timeout: 60_000 }); // origen del cliente
     await captura(page, "05-ficha-cliente");
 
     await ir(page, "/pedidos", "Pedidos");
@@ -78,6 +80,7 @@ describe("datos de ejemplo y pantallas con movimiento", () => {
 
     await ir(page, "/reportes", "Reportes");
     await page.getByText("Mensajes recibidos").waitFor({ timeout: 60_000 });
+    assert.deepEqual(await botonesSinEstilo(page), [], "hay botones que se ven como texto suelto en Reportes");
     await captura(page, "07-reportes");
 
     await ir(page, "/hoy", "Hoy");
@@ -144,6 +147,7 @@ describe("catálogo público", () => {
     await page.getByLabel("Mostrar mi catálogo", { exact: false }).check();
     await page.getByRole("button", { name: "Guardar", exact: true }).click();
     await page.getByText("Tu enlace y código QR").waitFor({ timeout: 60_000 });
+    assert.deepEqual(await botonesSinEstilo(page), [], "hay botones que se ven como texto suelto en Catálogo público");
     await captura(page, "12-tienda");
     const enlace = await page.locator("section a[href*='/c/']").first().innerText();
     assert.match(enlace, /\/c\/panaderia-publica/);

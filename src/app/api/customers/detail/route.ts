@@ -15,7 +15,7 @@ export const GET = route(async (req) => {
 
   const data = await withTenant(tenantId, async (db) => {
     const c = await db.query(
-      "SELECT id, wa_id, display_name, label, tags, notes, notifications_off, promo_consent_at, promo_consent_source, created_at, updated_at FROM contacts WHERE tenant_id = $1 AND id = $2",
+      "SELECT id, wa_id, display_name, label, tags, notes, notifications_off, promo_consent_at, promo_consent_source, created_at, updated_at, origin_type, origin_url, origin_headline FROM contacts WHERE tenant_id = $1 AND id = $2",
       [tenantId, id.data],
     );
     if (c.rowCount !== 1) return null;
@@ -60,6 +60,7 @@ export const GET = route(async (req) => {
     customer: {
       id: c.id, name: (c.display_name as string | null) || null, waId: c.wa_id, label: c.label, tags: c.tags as string[], notes: (c.notes as string | null) ?? "",
       optedOut: c.notifications_off, consentAt: c.promo_consent_at, consentSource: c.promo_consent_source, createdAt: c.created_at, updatedAt: c.updated_at, messagesReceived: data.inbound,
+      origin: c.origin_type ? { type: c.origin_type as "anuncio" | "publicacion", url: (c.origin_url as string | null) ?? null, headline: (c.origin_headline as string | null) ?? null } : null,
     },
     spent: data.spent.map((s) => ({ currency: s.currency, totalMinor: Number(s.total), orders: s.n })),
     conversations: data.convs.map((v) => ({ id: v.id, status: v.status, lastMessageAt: v.last_message_at, createdAt: v.created_at, lastBody: v.last_body })),

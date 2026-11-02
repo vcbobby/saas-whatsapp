@@ -7,6 +7,9 @@ export interface Report {
   from: string; to: string; days: number;
   conversations: number;
   newCustomers: Delta;
+  /** Clientes nuevos que llegaron desde un anuncio o publicación, agrupados (los 5 más frecuentes), y el total. */
+  origins: { label: string; count: number }[];
+  originTotal: number;
   inbound: Delta;
   byAssistant: number;
   byPerson: number;
@@ -70,6 +73,7 @@ export function reportLines(r: Report): string[] {
   const out: string[] = [];
   out.push(`Atendiste ${n(r.conversations, "conversación", "conversaciones")} y recibiste ${n(r.inbound.current, "mensaje", "mensajes")}${vsText(r.inbound)}.`);
   if (r.newCustomers.current > 0) out.push(`Clientes nuevos: ${r.newCustomers.current}${vsText(r.newCustomers)}.`);
+  if (r.originTotal > 0) out.push(`${n(r.originTotal, "cliente nuevo llegó", "clientes nuevos llegaron")} desde anuncios o publicaciones${r.origins[0] ? `; el que más trajo: ${r.origins[0].label} (${r.origins[0].count})` : ""}.`);
   if (r.byAssistant + r.byPerson > 0) {
     const total = r.byAssistant + r.byPerson;
     out.push(`El asistente envió ${r.byAssistant} respuestas (${Math.round((r.byAssistant / total) * 100)} %) y tu equipo ${r.byPerson}.`);

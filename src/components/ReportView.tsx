@@ -93,6 +93,13 @@ export function ReportView() {
           </ul>
         )}
       </section>
+      {r.originTotal > 0 && (
+        <section>
+          <h2 className="text-[20px]">¿De dónde llegaron tus clientes nuevos?</h2>
+          <p className="muted-dark mt-1 text-[14px]">{r.originTotal} de {r.newCustomers.current} {r.newCustomers.current === 1 ? "cliente nuevo llegó" : "clientes nuevos llegaron"} desde un anuncio o una publicación; el resto escribió directo.</p>
+          <ul className="mt-3 list-disc pl-5 text-[15px]">{r.origins.map((o) => <li key={o.label}>{o.label} · {o.count}</li>)}</ul>
+        </section>
+      )}
       {r.topProducts.length > 0 && (
         <section>
           <h2 className="text-[20px]">Lo más pedido</h2>

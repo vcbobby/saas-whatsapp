@@ -5,10 +5,11 @@ import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { formatMoney, type Currency } from "@/lib/catalog/money";
 import { postJson } from "@/lib/client";
 import { CONSENT_SOURCES, CONSENT_SOURCE_TEXT, MAX_TAGS, MAX_TAG_LENGTH, splitTagInput, type ConsentSource } from "@/lib/customers/tags";
+import { originText } from "@/lib/origin";
 import { CONTACT_LABEL_TEXT, CONTACT_LABELS, CONVERSATION_STATUS_LABEL, type ContactLabel } from "@/lib/work/labels";
 
 interface Detail {
-  customer: { id: string; name: string | null; waId: string; label: ContactLabel; tags: string[]; notes: string; optedOut: boolean; consentAt: string | null; consentSource: ConsentSource | null; createdAt: string; messagesReceived: number };
+  customer: { id: string; name: string | null; waId: string; label: ContactLabel; tags: string[]; notes: string; optedOut: boolean; consentAt: string | null; consentSource: ConsentSource | null; createdAt: string; messagesReceived: number; origin: { type: "anuncio" | "publicacion"; url: string | null; headline: string | null } | null };
   spent: { currency: Currency; totalMinor: number; orders: number }[];
   conversations: { id: string; status: string; lastMessageAt: string | null; createdAt: string; lastBody: string | null }[];
   orders: { id: string; number: number; status: string; currency: Currency; totalMinor: number; createdAt: string; items: string | null }[];
@@ -82,6 +83,9 @@ export function CustomerFile({ id, canEdit }: { id: string; canEdit: boolean }) 
           <div>
             <h2 className="text-[26px]">{c.name ?? `+${c.waId}`}</h2>
             <p className="muted mt-1 text-[14px]">+{c.waId} · Cliente desde {day(c.createdAt)} · {c.messagesReceived} {c.messagesReceived === 1 ? "mensaje recibido" : "mensajes recibidos"}</p>
+            {c.origin && (
+              <p className="mt-1 text-[14px]">📣 {originText(c.origin.type, c.origin.headline)}{c.origin.url && <> · <a href={c.origin.url} className="link" target="_blank" rel="noopener noreferrer">Ver</a></>}</p>
+            )}
           </div>
           <div className="field" style={{ minWidth: 220 }}>
             <label htmlFor={`${uid}-tipo`}>Tipo de contacto</label>

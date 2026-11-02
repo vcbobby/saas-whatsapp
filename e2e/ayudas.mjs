@@ -57,6 +57,24 @@ export async function registrarse(page, negocio = "Negocio de Prueba") {
 }
 
 export async function captura(page, nombre) {
+  // Esperar a que la página termine de cargar y a que React se «hidrate»: tomar la foto antes puede alterar el HTML y producir un aviso falso de hidratación.
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
   await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" }); // la insignia de desarrollo de Next
-  await page.screenshot({ path: `${CAPTURAS}${nombre}.png`, fullPage: true });
+  // caret: "initial" → Playwright no escribe «caret-color: transparent» en los campos (eso es lo que disparaba el aviso de hidratación).
+  await page.screenshot({ path: `${CAPTURAS}${nombre}.png`, fullPage: true, caret: "initial" });
+}
+
+/** Botones (clase «btn») que se ven como texto suelto: sin borde ni fondo y que no son los de texto a propósito. Devuelve su texto. */
+export async function botonesSinEstilo(page) {
+  return page.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll("button.btn, a.btn")) {
+      if (el.classList.contains("btn-text") || !(el instanceof HTMLElement) || el.offsetParent === null) continue;
+      const cs = getComputedStyle(el);
+      const sinBorde = ["Top", "Right", "Bottom", "Left"].every((l) => parseFloat(cs[`border${l}Width`]) === 0 || cs[`border${l}Style`] === "none" || /rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)|^transparent$/.test(cs[`border${l}Color`]));
+      const sinFondo = cs.backgroundColor === "rgba(0, 0, 0, 0)" || cs.backgroundColor === "transparent";
+      if (sinBorde && sinFondo) out.push((el.textContent || "").trim().slice(0, 40));
+    }
+    return out;
+  });
 }
